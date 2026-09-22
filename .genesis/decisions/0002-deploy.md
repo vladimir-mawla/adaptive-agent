@@ -60,18 +60,29 @@ absent — never a guessed or hardcoded SHA. A health endpoint whose one disting
 "proves what's live matches what's in the repo" would defeat its own purpose by fabricating that value
 when it doesn't have it.
 
-## Decision 3 — build command pinned explicitly for the Vercel project, not left to framework-preset default
+## Decision 3 — `vercel.json` pins `installCommand`/`buildCommand`; the framework-preset default was checked, found wrong, and overridden
 
 `next.config.ts` (landed at M1, for the same `.js`-suffixed-import reason `package.json`'s
 `build`/`dev` scripts already pass `--webpack`) requires the build to run through webpack, not
-Turbopack. Locally, `npm run build` guarantees this because it always resolves to the `package.json`
-script. Vercel's zero-config Next.js framework preset was not assumed to read that script by default
-without checking — this was verified against the actual build log (see the PR/report for the pasted
-log line), which confirms the deployed build ran `next build --webpack` (via `npm run build`) and shows
-`▲ Next.js 16.3.5 (webpack)`, the same banner the local build prints. The project's Vercel "Build
-Command" was left at its default (which resolves to the `package.json` `build` script), rather than
-adding a `vercel.json` override, once the build log confirmed the default already does the right
-thing — a `vercel.json` was not added speculatively for a problem the log showed did not exist.
+Turbopack — that file's own comment states Turbopack "fails outright... for every one of lib/'s
+internal `.js`-suffixed imports," no Turbopack option in this Next version works around it. Locally,
+`npm run build` guarantees webpack because it always resolves to the `package.json` script. Vercel's
+zero-config Next.js framework preset was **not** assumed to do the same without checking — and the
+check found it does not: `vercel link`'s own output, before any `vercel.json` existed in this tree,
+reported `Detected Next.js (Build Command: next build, Output Directory: Next.js default)` — plain
+`next build`, i.e. Turbopack, the exact case `next.config.ts` documents failing. Left uncorrected,
+the platform default would have built with the one bundler this project's own `lib/` cannot compile
+under. Separately, no install command was pinned either, leaving the platform's own default install
+step exposed to the identical `npm install`-drops-`@rolldown/binding-*` risk this repo's README
+already warns local contributors about for the same lockfile.
+
+**The fix:** `vercel.json` (tracked, committed in `9a23862`) pins `installCommand: "npm ci"` and
+`buildCommand: "npm run build"` — the same two commands `npm ci`/`npm run build` already run locally,
+so the deployed build is not a second, divergent build configuration, just the local one, pinned.
+**Verified after deploy, not just after adding the override:** the actual Vercel build log (pasted in
+the PR/report) shows `Running "install" command: npm ci...`, then `Running "npm run build"` →
+`> next build --webpack` → `▲ Next.js 16.3.5 (webpack)`, the same banner the local build prints — so
+the override is confirmed to have taken effect, not merely assumed from `vercel.json` being present.
 
 ## Decision 4 — deploy from a clean, fully-committed tree at the branch's real `HEAD`, verified after the fact
 
