@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DONE — adaptive-agent</title>
+<style>
+  :root { --bg:#0d1117; --card:#161b22; --line:#30363d; --ink:#e6edf3; --mut:#8b949e;
+          --ok:#2ea043; --warn:#d29922; --bad:#f85149; --accent:#58a6ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:15px/1.55 ui-sans-serif,-apple-system,Segoe UI,Roboto,sans-serif; }
+  .wrap { max-width:920px; margin:0 auto; padding:32px 24px 80px; }
+  h1 { font-size:26px; margin:0 0 4px; }
+  h2 { font-size:18px; margin:32px 0 12px; border-bottom:1px solid var(--line); padding-bottom:6px; }
+  .sub { color:var(--mut); margin:0 0 24px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px 18px; margin:12px 0; }
+  .locked { border-left:3px solid var(--warn); }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th,td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--mut); font-weight:600; }
+  code { background:#1f2630; padding:1px 6px; border-radius:5px; font-size:13px; }
+  .gate { display:flex; gap:10px; align-items:flex-start; padding:6px 0; }
+  .box { width:16px; height:16px; border:1.5px solid var(--mut); border-radius:4px; flex:0 0 auto; margin-top:2px; }
+  .done .box { background:var(--ok); border-color:var(--ok); }
+  .done .label { color:var(--mut); text-decoration:line-through; }
+  .pill { display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); color:var(--mut); }
+  .pill.ok{color:var(--ok);border-color:var(--ok);} .pill.wip{color:var(--warn);border-color:var(--warn);} .pill.todo{color:var(--mut);border-color:var(--mut);}
+  .note { color:var(--mut); font-size:13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>DONE — adaptive-agent</h1>
+  <p class="sub">The single source of truth for <b>what "done" means</b> and <b>the implementation plan</b>.
+     This file is LOCKED — the driver model may not edit it without explicit user request.
+     Updated: 2026-09-22</p>
+
+  <!-- ───────────── THE LOCKED SPEC ───────────── -->
+  <h2>1 · The Locked Spec (what we are building)</h2>
+  <div class="card locked">
+    <p><b>Cognitive job:</b> Given a candidate change (<code>BehaviorDelta</code>) to one knob of an
+       agent's own behavior, and a stream of independent, per-occasion evidence (<code>Episode</code>s)
+       bearing on it, decide whether that change has earned the right to stick — corroborated across
+       genuinely distinct occasions, not merely repeated — while an absolute, no-escape-hatch freeze on
+       a fixed set of invariant-protected knobs refuses to let any amount of evidence touch them at all,
+       and a previously adopted change that turns out to have made things worse can be honestly and
+       provably reversed. See <code>.genesis/PLAN.md</code> §1–2 for the full claim and closed
+       vocabulary.</p>
+    <p><b>Inputs:</b> a typed <code>BehaviorDelta</code> naming one <code>KnobId</code> plus a
+       <code>from</code>/<code>to</code> pair, and an <code>Episode[]</code> each carrying a
+       <code>contextId</code> (the unit of independence) and a closed
+       <code>"helped" | "neutral" | "harmed"</code> outcome — never a numeric score standing in for
+       corroboration. &nbsp;→&nbsp; <b>Outputs:</b> a closed <code>AdaptationDecision</code>
+       (<code>adopt</code> · <code>hold</code> · <code>revert</code> · <code>frozen</code>), always
+       paired with the <code>EvidenceTally</code> that licensed it (or, for <code>frozen</code>, the
+       <code>Invariant</code> that forbade it outright).</p>
+    <p><b>Autonomy level:</b> Fully autonomous end-to-end — tallying evidence, gating against
+       invariants, and ruling <code>adopt</code>/<code>hold</code>/<code>revert</code>/<code>frozen</code>
+       all happen without a human in the loop. What is deliberately NOT available to any engine
+       milestone, at the type level, is a way to widen, mutate, or bypass the invariant list at
+       runtime: an invariant-protected knob has no escape-hatch lane at all, unlike
+       <code>agent-control-tower</code>'s human-authorized forced halt.</p>
+    <p><b>Failure tolerance:</b> Fail toward the weaker, more conservative decision, never toward a
+       fabricated stronger one. A delta below <code>MIN_DISTINCT_CONTEXTS_ADOPT</code> must return
+       <code>hold</code> with an explicit <code>distinctContextsNeeded</code> — never a silently
+       optimistic <code>adopt</code>. A single post-adoption <code>harmed</code> episode must not, on
+       its own, trigger <code>revert</code> — the revert bar is lower than the adopt bar (the disclosed
+       asymmetry in §1/§3 M5), but it is not zero. <code>N</code> episodes from one <code>contextId</code>
+       are never worth more than <code>distinctContexts: 1</code>, no matter how large <code>N</code>
+       is.</p>
+    <p class="note">Filled during Genesis (G0–G2, <code>.genesis/PLAN.md</code>), following the shape used
+       in agent-control-tower's own <code>.genesis/DONE.html</code> (the current house standard) —
+       content is project-specific, structure only is borrowed. No engine code exists yet: M1
+       (contracts) is a separate milestone with its own PR and its own verifier.</p>
+  </div>
+
+  <!-- ───────────── DEFINITION OF DONE ───────────── -->
+  <h2>2 · Definition of Done (binary gates — checked by the VERIFIER, not the maker)</h2>
+  <div class="card">
+    <div class="gate"><span class="box"></span><span class="label">Dependency direction inward, zero cycles: <code>lib/contracts</code> → <code>lib/evidence</code> and <code>lib/invariants</code> → <code>lib/arbitrate</code> → <code>domains/support-triage</code>, one-directional <span class="note">(modular-architecture gate)</span></span></div>
+    <div class="gate"><span class="box"></span><span class="label"><code>npm run typecheck</code> clean AND <code>npm test</code> green</span></div>
+    <div class="gate"><span class="box"></span><span class="label">One <code>verify</code> pass by a <b>separate</b> agent/model (L4)</span></div>
+    <div class="gate"><span class="box"></span><span class="label">No milestone's freeze boundary touched by a later milestone <span class="note">(freeze-boundary gate — the independent verifier's first job on every milestone)</span></span></div>
+    <div class="gate"><span class="box"></span><span class="label">A <code>frozen</code> <code>AdaptationDecision</code> literal carrying a <code>tally</code> field must not compile; a source-scan test proves no function under <code>lib/invariants/**</code>'s non-test source constructs, mutates, or spreads a modified invariants array <span class="note">(no-runtime-escape-hatch gate, from M1/M4)</span></span></div>
+    <div class="gate"><span class="box"></span><span class="label"><code>AdaptationDecision</code> is exhaustively matched via an <code>assertNeverAdaptationDecision</code> helper, proven live by adding a 5th variant and confirming every call site fails to compile <span class="note">(exhaustiveness-is-live gate, from M1)</span></span></div>
+    <div class="gate"><span class="box"></span><span class="label"><code>tally</code> is proven order-independent across every permutation of an episode set, dedups strictly by <code>contextId</code> (never episode count), and rejects a hostile (throwing-getter/<code>Proxy</code>) episodes array as a typed failure, never an uncaught exception <span class="note">(pure-and-hostile-input gate, from M3)</span></span></div>
+    <div class="gate"><span class="box"></span><span class="label">A delta targeting an invariant-protected knob resolves <code>frozen</code> whether it has zero episodes or ten thousand, all <code>"helped"</code> — evidence quantity or quality never changes the gate's answer <span class="note">(evidence-cannot-buy-a-frozen-knob gate, from M4/M5)</span></span></div>
+    <div class="gate"><span class="box"></span><span class="label"><code>arbitrate</code> never selects <code>adopt</code> below <code>MIN_DISTINCT_CONTEXTS_ADOPT</code> nor <code>revert</code> off a single post-adoption <code>harmed</code> episode, and never lets two deltas targeting the same live knob both resolve <code>adopt</code> at once <span class="note">(asymmetric-bar and single-live-delta-per-knob gate, from M5/M7)</span></span></div>
+    <div class="gate"><span class="box"></span><span class="label">The failure suite's ten cases each assert a specific typed result, not merely "no exception thrown," including the disclosed, unsolved cumulative-drift case <span class="note">(failure-suite gate, from M7)</span></span></div>
+    <div class="gate"><span class="box"></span><span class="label">The live demo URL injects distinct-context episodes and produces the same <code>AdaptationDecision</code> sequence as <code>npm run demo:triage</code>'s own fixture, checked by an independent verifier comparing outputs directly <span class="note">(deliverable gate — the brief requires a live demo)</span></span></div>
+    <div class="gate"><span class="box"></span><span class="label">A clean clone plus <code>npm ci</code> plus typecheck plus test passes with no credentials configured <span class="note">(clean-clone gate)</span></span></div>
+    <p class="note">A milestone is DONE only when every applicable box above is checked by the verifier,
+       and never by the building agent marking its own work. This genesis repo has no engine code yet —
+       every gate above becomes checkable starting with M1's own PR and its own verifier.</p>
+  </div>
+
+  <!-- ───────────── IMPLEMENTATION PLAN ───────────── -->
+  <h2>3 · Implementation Plan (the work, sliced into milestones)</h2>
+  <div class="card">
+    <table>
+      <thead><tr><th>#</th><th>Milestone</th><th>Phase</th><th>Demo command (proves it works)</th><th>Loops</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>M1</td><td>Contracts: Invariant, KnobId, BehaviorDelta, Episode, EvidenceTally, AdaptationDecision</td><td>BUILD</td><td><code>npm test -- lib/contracts</code></td><td>L1, L4</td><td><span class="pill todo">todo</span></td></tr>
+        <tr><td>M2</td><td>Deploy a live skeleton to Vercel</td><td>DEPLOY</td><td><code>curl -sf $DEPLOY_URL/api/health</code></td><td>L1, L4</td><td><span class="pill todo">todo</span></td></tr>
+        <tr><td>M3</td><td>Evidence tallying (<code>tally</code>)</td><td>BUILD</td><td><code>npm test -- lib/evidence</code></td><td>L1, L4</td><td><span class="pill todo">todo</span></td></tr>
+        <tr><td>M4</td><td>The invariant gate (<code>gate</code>)</td><td>BUILD</td><td><code>npm test -- lib/invariants</code></td><td>L1, L4</td><td><span class="pill todo">todo</span></td></tr>
+        <tr><td>M5</td><td>Arbitration (<code>arbitrate</code>)</td><td>BUILD</td><td><code>npm test -- lib/arbitrate</code></td><td>L1, L4</td><td><span class="pill todo">todo</span></td></tr>
+        <tr><td>M6</td><td>Domain: support-triage agent</td><td>INTEGRATE</td><td><code>npm run demo:triage</code></td><td>L1, L4</td><td><span class="pill todo">todo</span></td></tr>
+        <tr><td>M7</td><td>The failure suite (~10 deliberate cases)</td><td>VERIFY</td><td><code>npm test -- failures</code></td><td>L1, L4</td><td><span class="pill todo">todo</span></td></tr>
+        <tr><td>M8</td><td>The interactive demo</td><td>BUILD</td><td>deployed URL runs live episode injection end-to-end</td><td>L1, L4</td><td><span class="pill todo">todo</span></td></tr>
+        <tr><td>M9</td><td>Deliverables</td><td>RELEASE</td><td><code>git clone ... && npm ci && npm run typecheck && npm test</code></td><td>L1, L4</td><td><span class="pill todo">todo</span></td></tr>
+      </tbody>
+    </table>
+    <p class="note">Total token budget = 9 milestones × 150000. Update <span class="pill wip">wip</span> /
+       <span class="pill ok">done</span> as loops complete — a milestone only flips to <code>done</code>
+       after independent (L4) verification, never by the building agent marking its own work. This is the
+       genesis (G0–G2) repo only: no milestone has started, so all nine rows above are <code>todo</code>.
+       This table is mirrored in <code>PLAN.md</code> for the agent to parse.</p>
+  </div>
+
+</div>
+</body>
+</html>
