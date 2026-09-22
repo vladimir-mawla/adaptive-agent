@@ -40,7 +40,18 @@ does not have this problem.
 ## Status
 
 This is a genesis-only repository. It has the tooling skeleton, the `.genesis/` planning artifacts,
-and a placeholder home page — no engine code and no domain logic yet. `lib/contracts/**` (M1) is a
-separate milestone with its own PR and its own independent verifier, and each of the other eight
-milestones in `.genesis/PLAN.md` follows the same pattern. There is **no live URL yet**; M2 deploys a
-minimal skeleton to Vercel next, deliberately early rather than left to the end.
+and a placeholder home page — no engine code and no domain logic yet beyond `lib/contracts/**` (M1,
+frozen) and the M2 deploy skeleton below. `lib/contracts/**` is a separate milestone with its own PR
+and its own independent verifier, and each of the other eight milestones in `.genesis/PLAN.md` follows
+the same pattern.
+
+**Live:** <https://adaptive-agent-gamma.vercel.app> — deployed at milestone 2, deliberately early
+rather than left to the end (the house rule this project's siblings all follow: a prior hackathon
+project that deferred deployment to the end never shipped a live URL at all).
+
+`GET /api/health` runs a real self-check against `lib/contracts` — it exercises
+`assertFrozenCitesNoEvidence` (the one M1 contracts function with genuine runtime branching) in both
+directions, a well-formed `frozen` decision and one that reached the same type only through an unsafe
+cast while carrying evidence, and reports the deployed commit SHA. It returns `503`, not `200`, if
+either check fails. See `.genesis/decisions/0002-deploy.md` for the full reasoning and the local
+proof that it actually flips to `503` under a real regression.
