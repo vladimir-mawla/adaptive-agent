@@ -1,28 +1,218 @@
 import { describe, expect, it } from "vitest";
-import type { AdaptationDecision } from "../adaptation-decision.js";
-import { assertNeverAdaptationDecision } from "../adaptation-decision.js";
+import type { AdaptationDecision, FrozenDecision } from "../adaptation-decision.js";
+import { assertFrozenCitesNoEvidence, assertNeverAdaptationDecision } from "../adaptation-decision.js";
 import { behaviorDeltaId, invariantId } from "../ids.js";
 
 const DELTA = behaviorDeltaId("delta-1");
 const INVARIANT = invariantId("auto-refund-ceiling");
 const TALLY = { deltaId: DELTA, distinctContexts: 3, helped: 3, neutral: 0, harmed: 0 };
 
-describe("AdaptationDecision.frozen structurally excludes a tally — unsayable, not merely unchecked", () => {
-  it("constructs a valid frozen decision with no tally field", () => {
+/**
+ * ROUND 2 — L4 VERIFY rejected this milestone's original claim here
+ * ("frozen structurally excludes a tally — unsayable, not merely
+ * unchecked"): that claim rested entirely on TypeScript's excess-property
+ * check, which applies only to a FRESH object literal written directly at
+ * an assignment/argument/array-element site. Seven routes that are not
+ * fresh literals all compiled clean against the original type. The fix
+ * (adaptation-decision.ts: `tally?: never`, `distinctContextsNeeded?:
+ * never`, `revertedTo?: never` on `frozen`) closes six of the seven;
+ * the seventh (a deliberate `as unknown as` cast) is a disclosed,
+ * intentional residual, not a gap this suite pretends is closed. See
+ * adaptation-decision.ts's own "ROUND 2" header for the full incident.
+ */
+describe("AdaptationDecision.frozen refuses tally/distinctContextsNeeded/revertedTo through every route tested except a deliberate cast", () => {
+  it("constructs a valid frozen decision with no evidence fields", () => {
     const frozen: AdaptationDecision = { kind: "frozen", deltaId: DELTA, invariant: INVARIANT };
     expect(frozen.kind).toBe("frozen");
     expect("tally" in frozen).toBe(false);
   });
 
-  it("TYPE-LEVEL: a frozen literal carrying a tally does not compile", () => {
+  it("TYPE-LEVEL: a fresh frozen literal carrying a tally does not compile", () => {
+    // @ts-expect-error — a real EvidenceTally is not assignable to `tally?: never` on `frozen`.
+    const frozen: AdaptationDecision = { kind: "frozen", deltaId: DELTA, invariant: INVARIANT, tally: TALLY };
+    expect(frozen).toBeDefined();
+  });
+
+  it("TYPE-LEVEL: a fresh frozen literal carrying distinctContextsNeeded does not compile", () => {
     const frozen: AdaptationDecision = {
       kind: "frozen",
       deltaId: DELTA,
       invariant: INVARIANT,
-      // @ts-expect-error — `frozen` has no `tally` field on the type at all; citing evidence for a frozen refusal would misrepresent why it fired (plan §2).
-      tally: TALLY,
+      // @ts-expect-error — distinctContextsNeeded is `never` on `frozen`: it is an evidence-summary field, not a knob-identity field.
+      distinctContextsNeeded: 2,
     };
     expect(frozen).toBeDefined();
+  });
+
+  it("TYPE-LEVEL: a fresh frozen literal carrying revertedTo does not compile", () => {
+    // @ts-expect-error — revertedTo is `never` on `frozen`: a frozen decision never rolls a knob back because it never moved it.
+    const frozen: AdaptationDecision = { kind: "frozen", deltaId: DELTA, invariant: INVARIANT, revertedTo: "x" };
+    expect(frozen).toBeDefined();
+  });
+
+  // A single value carrying all three evidence fields at once, so no test
+  // below can accidentally pass because it only exercises a field a
+  // narrower fix happened to cover.
+  const sneaky = {
+    kind: "frozen" as const,
+    deltaId: DELTA,
+    invariant: INVARIANT,
+    tally: TALLY,
+    distinctContextsNeeded: 2,
+    revertedTo: "x",
+  };
+
+  function identity<T>(x: T): T {
+    return x;
+  }
+
+  it("TYPE-LEVEL route 1/6 — intermediate binding does not compile", () => {
+    // @ts-expect-error — assigning a pre-built object carrying evidence fields fails on assignability, not just on a fresh literal.
+    const a: AdaptationDecision = sneaky;
+    expect(a).toBeDefined();
+  });
+
+  it("TYPE-LEVEL route 2/6 — spread does not compile", () => {
+    // @ts-expect-error — spreading `sneaky` still carries its evidence fields into the assigned value.
+    const b: AdaptationDecision = { ...sneaky };
+    expect(b).toBeDefined();
+  });
+
+  it("TYPE-LEVEL route 3/6 — function return does not compile", () => {
+    function f(): AdaptationDecision {
+      // @ts-expect-error — returning `sneaky` is checked the same as assigning it.
+      return sneaky;
+    }
+    expect(f).toBeDefined();
+  });
+
+  it("TYPE-LEVEL route 4/6 — generic helper does not compile", () => {
+    // @ts-expect-error — a generic identity helper does not launder the evidence fields past assignability.
+    const d: AdaptationDecision = identity(sneaky);
+    expect(d).toBeDefined();
+  });
+
+  it("TYPE-LEVEL route 5/6 — Object.assign does not compile", () => {
+    // @ts-expect-error — Object.assign's result still structurally carries the evidence fields.
+    const e: AdaptationDecision = Object.assign({}, sneaky);
+    expect(e).toBeDefined();
+  });
+
+  it("TYPE-LEVEL route 6/6 — array element does not compile", () => {
+    // @ts-expect-error — an array element is checked the same as a single assignment.
+    const arr: AdaptationDecision[] = [sneaky];
+    expect(arr).toBeDefined();
+  });
+
+  it("DISCLOSED RESIDUAL: a deliberate `as unknown as` cast still bypasses this, and is not claimed to be closed", () => {
+    // Deliberately NOT a @ts-expect-error: this is meant to compile clean,
+    // pinning the one route the ROUND 2 fix does not and cannot close, so
+    // the gap is documented rather than silently rediscoverable later.
+    // assertFrozenCitesNoEvidence (tested below) is the runtime guard this
+    // residual requires — recorded as a build requirement for M5 in
+    // .genesis/decisions/0001-contracts.md.
+    const cast = sneaky as unknown as AdaptationDecision;
+    expect(cast.kind).toBe("frozen");
+    expect((cast as typeof sneaky).tally).toEqual(TALLY);
+  });
+});
+
+/**
+ * L4 VERIFY's own question: "can an `adopt` be built carrying an
+ * `invariant` field?" Checked, not assumed — yes, via the identical
+ * non-literal-route mechanism, and this milestone deliberately does not
+ * mirror `?: never` onto adopt/hold/revert to close it. See
+ * adaptation-decision.ts's own header for the reasoning: only `frozen` is
+ * named by the plan as needing to be structurally incapable of appearing
+ * evidence-driven; adopt/hold/revert are already evidence-driven by their
+ * own required `tally`, so a stray field from a different variant does
+ * not create the same "misrepresents why it fired" risk.
+ */
+describe("HONEST LIMIT: adopt/hold/revert are not mirrored against carrying each other's fields (deliberate scope boundary)", () => {
+  it("adopt can still carry a stray invariant field via a non-literal route today", () => {
+    const sneakyAdopt = { kind: "adopt" as const, deltaId: DELTA, tally: TALLY, invariant: INVARIANT };
+    const adopt: AdaptationDecision = sneakyAdopt;
+    expect(adopt.kind).toBe("adopt");
+    expect((adopt as typeof sneakyAdopt).invariant).toBe(INVARIANT);
+  });
+
+  it("hold can still carry a stray revertedTo field via a non-literal route today", () => {
+    const sneakyHold = {
+      kind: "hold" as const,
+      deltaId: DELTA,
+      tally: TALLY,
+      distinctContextsNeeded: 2,
+      revertedTo: "x",
+    };
+    const hold: AdaptationDecision = sneakyHold;
+    expect(hold.kind).toBe("hold");
+    expect((hold as typeof sneakyHold).revertedTo).toBe("x");
+  });
+
+  it("revert can still carry a stray distinctContextsNeeded field via a non-literal route today", () => {
+    const sneakyRevert = {
+      kind: "revert" as const,
+      deltaId: DELTA,
+      tally: TALLY,
+      revertedTo: "x",
+      distinctContextsNeeded: 2,
+    };
+    const revert: AdaptationDecision = sneakyRevert;
+    expect(revert.kind).toBe("revert");
+    expect((revert as typeof sneakyRevert).distinctContextsNeeded).toBe(2);
+  });
+});
+
+/**
+ * assertFrozenCitesNoEvidence — the runtime guard for the one residual
+ * the type-level fix cannot close (a deliberate cast). Proven against a
+ * genuine value (ok:true) and against three forged values, one per
+ * evidence field, each built with the exact `as unknown as FrozenDecision`
+ * cast the disclosed-residual test above demonstrates compiles clean.
+ */
+describe("assertFrozenCitesNoEvidence catches the disclosed cast residual at runtime", () => {
+  it("returns ok:true for a genuine frozen decision", () => {
+    const frozen: AdaptationDecision = { kind: "frozen", deltaId: DELTA, invariant: INVARIANT };
+    expect(assertFrozenCitesNoEvidence(frozen as FrozenDecision)).toEqual({ ok: true });
+  });
+
+  it("catches a tally that arrived via the disclosed cast residual", () => {
+    const forged = {
+      kind: "frozen" as const,
+      deltaId: DELTA,
+      invariant: INVARIANT,
+      tally: TALLY,
+    } as unknown as FrozenDecision;
+    expect(assertFrozenCitesNoEvidence(forged)).toEqual({
+      ok: false,
+      error: { kind: "unexpected-evidence-on-frozen", field: "tally", received: TALLY },
+    });
+  });
+
+  it("catches a distinctContextsNeeded that arrived via the disclosed cast residual", () => {
+    const forged = {
+      kind: "frozen" as const,
+      deltaId: DELTA,
+      invariant: INVARIANT,
+      distinctContextsNeeded: 2,
+    } as unknown as FrozenDecision;
+    expect(assertFrozenCitesNoEvidence(forged)).toEqual({
+      ok: false,
+      error: { kind: "unexpected-evidence-on-frozen", field: "distinctContextsNeeded", received: 2 },
+    });
+  });
+
+  it("catches a revertedTo that arrived via the disclosed cast residual", () => {
+    const forged = {
+      kind: "frozen" as const,
+      deltaId: DELTA,
+      invariant: INVARIANT,
+      revertedTo: "x",
+    } as unknown as FrozenDecision;
+    expect(assertFrozenCitesNoEvidence(forged)).toEqual({
+      ok: false,
+      error: { kind: "unexpected-evidence-on-frozen", field: "revertedTo", received: "x" },
+    });
   });
 });
 
