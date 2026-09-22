@@ -16,42 +16,127 @@ the alternatives rejected, and — per this account's own standing discipline ag
 resolving an ambiguous plan — a real gap the plan's own text leaves open, and how this milestone
 chose to close it rather than guess past it.
 
-## Decision 1 — `AdaptationDecision.frozen`: no `tally` field, proven with `@ts-expect-error`, not by convention
+## Decision 1 — `AdaptationDecision.frozen`: refuses evidence-shaped fields, proven with `@ts-expect-error` — REVISED AFTER L4 VERIFY REJECTION (round 2)
 
-`AdaptationDecision` is implemented exactly as plan §2's code block: four variants discriminated on
-`kind`, `frozen` carrying only `{ kind, deltaId, invariant }` — no `tally` property is declared on
-that member anywhere in `adaptation-decision.ts`. Because the union is discriminated (every member
-has a distinct literal `kind`), TypeScript's excess-property check narrows an object literal with
-`kind: "frozen"` to that member specifically and rejects any key the member doesn't declare — so
-writing `{ kind: "frozen", deltaId, invariant, tally: someTally }` directly is a compile error at the
-`tally` key, not a runtime check a caller could skip.
+### Round 1 (original decision, since falsified and corrected)
 
-**Falsifiability, run for real, not just described:** `lib/contracts/adaptation-decision.ts`'s
-`frozen` member was temporarily edited to `{ ...; readonly tally?: EvidenceTally }` (an optional
-field, minimal and uncompensated — no other file touched). `npm run typecheck` was run and failed,
-but not the way a missing check would fail: it failed with `TS2578: Unused '@ts-expect-error'
-directive` at `lib/contracts/__tests__/adaptation-decision.test.ts`'s own frozen/tally test — proof
-that the `@ts-expect-error` there was doing real work, not decorating an already-broken build. The
-edit was reverted and `typecheck` returned to clean (0 errors), confirmed again after restoring.
+`AdaptationDecision` was implemented exactly as plan §2's code block: four variants discriminated on
+`kind`, `frozen` carrying only `{ kind, deltaId, invariant }` — no `tally` property declared on that
+member. The round-1 claim was: "because the union is discriminated, TypeScript's excess-property check
+narrows an object literal with `kind: "frozen"` to that member and rejects any key it doesn't
+declare... there is no code path, anywhere, that can produce a `frozen` decision carrying a tally
+without TypeScript refusing to compile it."
 
-A second, independent falsifiability run: `assertNeverAdaptationDecision`'s exhaustiveness mechanism
-was proven live, not assumed, on a **local five-kind stand-in union** in the same test file (never on
-the real four-variant type, to avoid dishonestly widening it just to make a point — matching
-`agent-control-tower`'s own `assertNeverIntervention` test's documented choice). The stand-in switch's
-`"bogus"` case was temporarily removed; `npm run typecheck` failed with exactly the predicted error —
-`TS2345: Argument of type '{ kind: "bogus"; }' is not assignable to parameter of type 'never'` — at
-the `assertNeverStandIn(decision)` call site, because `decision` was narrowed to the unhandled shape
-in the `default` branch. Restoring the case returned `typecheck` to clean.
+**This claim was rejected by L4 VERIFY and confirmed false, not merely imprecise.** Excess property
+checking applies *only* to a fresh object literal written directly at an assignment, argument, or
+array-element site. L4 VERIFY reported seven working routes that never trigger it because none of
+them is a fresh literal at the point of assignment:
 
-A third run, against the "no override parameter" claim specifically: `assertNeverAdaptationDecision`'s
-signature was temporarily edited to add a second, optional `humanOverride?: string` parameter — a
-direct stand-in for the exact failure mode plan §4 (M5) names ("to ever consult a 'human override'
-parameter"). `npm test -- lib/contracts/__tests__/architecture.test.ts` failed immediately, flagging
-the injected parameter by file and line. Reverting the edit returned the suite to green. This is the
-one falsifiability experiment this report calls out as the most important: it is the only one of the
-three that directly exercises the plan's own words ("no such parameter exists in this function's
-signature at all") rather than the `tally`/exhaustiveness mechanics, and it is a check on THIS
-milestone's own code, honestly scoped — see Decision 3 for what it does and does not prove about M5.
+```ts
+const sneaky = { kind: "frozen" as const, deltaId: D, invariant: I, tally: T };
+const a: AdaptationDecision = sneaky;            // intermediate binding
+const b: AdaptationDecision = { ...sneaky };     // spread
+function f(): AdaptationDecision { return sneaky; }
+const c = sneaky satisfies object as AdaptationDecision;
+const d: AdaptationDecision = identity(sneaky);  // generic helper
+const e: AdaptationDecision = Object.assign({}, sneaky);
+const arr: AdaptationDecision[] = [sneaky];
+```
+
+All seven were reproduced for real, independently, against the round-1 type (a scratch file under
+`lib/contracts/`, deleted after) — all seven compiled clean, confirming the report rather than
+trusting it.
+
+### Round 2 — the fix, verified route by route, and the claim restated at the strength that survives
+
+**The fix:** `frozen` now declares `tally?: never`, `distinctContextsNeeded?: never`, and
+`revertedTo?: never` explicitly (all three evidence-shaped fields, not just `tally` — see "why all
+three" below). This moves the check from excess-property checking (literal-site-only) to ordinary
+assignability (checked at every site, literal or not): a real `EvidenceTally`/`number`/`KnobValue` is
+never assignable to `never`, so the error now fires at routes 1, 2, 3, 5, 6, 7 above.
+
+**Verified route by route, not just once:** each of the six closable routes was re-run against the
+fixed type and confirmed to fail with `TS2322` ("not assignable to type 'never'"/"'undefined'"); each
+now has its own `@ts-expect-error` proof in `__tests__/adaptation-decision.test.ts` ("TYPE-LEVEL route
+1/6" through "6/6"), built against a single `sneaky` value carrying all three evidence fields at once
+so a narrower fix touching only one field could not pass silently. Route 4 (the explicit
+`satisfies object as AdaptationDecision` cast, or the simpler `as unknown as AdaptationDecision`) was
+re-run and still compiles clean — expected, not accidental, and pinned as a *passing* (not
+`@ts-expect-error`) test named "DISCLOSED RESIDUAL" so the gap is documented rather than
+silently rediscoverable.
+
+**Why all three evidence fields, not just `tally` (L4 VERIFY's report named only `tally`):** the
+identical empirical check was run for `distinctContextsNeeded` and `revertedTo` leaking onto a
+`frozen` literal via the same non-literal routes — both compiled clean before this fix, for the
+identical structural reason. Both are evidence-shaped in the sense that matters to the plan's own
+reasoning: `distinctContextsNeeded` summarizes insufficient evidence, `revertedTo` is a value a
+post-adoption tally comparison produced. A `frozen` decision carrying either would misrepresent why it
+fired in exactly the way plan §2 names for `tally` specifically, so all three are closed together,
+checked, not assumed to generalize from the one field named in the report.
+
+**Whether `adopt`/`hold`/`revert` need the mirror treatment against each other's fields — checked, not
+assumed, and the answer is no, deliberately:** L4 VERIFY asked directly: "can an `adopt` be built
+carrying an `invariant` field?" The identical empirical check (intermediate binding) was run for
+`adopt` carrying a stray `invariant`, `hold` carrying a stray `revertedTo`, and `revert` carrying a
+stray `distinctContextsNeeded` — all three compile clean today, for the same structural reason as
+`frozen`'s original bug. **This is deliberately not fixed.** `frozen` is the one variant plan §2 names
+as needing to be structurally incapable of appearing evidence-driven ("a `frozen` decision citing
+evidence would misrepresent *why* it fired"). `adopt`/`hold`/`revert` are all already evidence-driven
+— each requires a real `tally` of its own — so a stray field from a different variant does not
+retroactively make an evidence-based decision look like it fired for a different, non-evidence reason;
+the `kind` discriminant a correct consumer switches on is untouched either way, and no plan bullet asks
+these three to refuse citing an invariant the way `frozen` must refuse citing evidence. Mirroring
+`?: never` onto every field of every other variant would be a defensive measure past what any specific
+plan refusal asks for, and past what this account's own sibling projects apply to their own
+discriminated unions (`agent-control-tower`'s `Intervention` does not declare `checkpointId?: never`
+on its `warn` variant to block the identical class of leakage). This scope boundary is disclosed as a
+passing "HONEST LIMIT" test in `__tests__/adaptation-decision.test.ts`, not left silent.
+
+**The claim, restated once, at exactly the strength that survives:** a `frozen` decision cannot be
+constructed carrying `tally`, `distinctContextsNeeded`, or `revertedTo` through any route that does not
+name `AdaptationDecision` (or an equivalent cast target) explicitly and in cleartext at the
+construction site — a fresh literal, an intermediate binding, a spread, a function return, a generic
+helper, `Object.assign`, and an array element, all six checked directly. It *can* still be constructed
+that way through a deliberate `as`/`as unknown as` cast. This is the same disclosed residual
+`agent-control-tower`'s own `HumanId` names and does not claim to solve: no TypeScript design stops a
+deliberate, visible cast — closing it would mean rejecting a language feature, not writing a better
+type.
+
+**Is the resulting guarantee sufficient for M5, or must `arbitrate` carry its own runtime check?**
+**`arbitrate` must call a runtime check.** The type-level fix closes six of seven routes but cannot
+close a deliberate cast, and `arbitrate` (M5, unbuilt; plan §4's own signature is
+`arbitrate(delta, tally, gateResult, priorState)`) is exactly the function most likely to assemble a
+`frozen`-shaped return value from a shared intermediate representation where a cast could plausibly be
+used to reconcile shapes. `assertFrozenCitesNoEvidence` (new in this round, `adaptation-decision.ts`)
+is the parallel runtime guard, built now in M1 rather than deferred — the same shape
+`agent-control-tower`'s `assertValidHaltForced` takes for its own analogous residual: it inspects a
+`FrozenDecision` value for a populated `tally`/`distinctContextsNeeded`/`revertedTo` at runtime and
+returns a typed `{ ok: false, error }` if any is present, rather than throwing directly (so a caller
+must inspect the result, not just avoid catching an exception). **This is recorded here as a BUILD
+REQUIREMENT for M5: `arbitrate` must call `assertFrozenCitesNoEvidence` on any `frozen` decision it is
+about to return or forward, and refuse to trust one that fails it** — not left to be rediscovered when
+M5 is built. What this function does NOT do, stated at its true strength: it cannot stop a `frozen`
+value from being constructed with a populated evidence field in the first place, and it cannot verify
+that a *forged but well-formed* evidence field (e.g. a fabricated `EvidenceTally` shape) is genuine —
+it only checks presence, the same honest, narrow scope `assertValidHaltForced` claims for itself
+against forged-but-well-formed `HumanId`/`ConflictId` values.
+
+**Falsifiability, run for real at every step above, not just described once:**
+1. `frozen`'s `tally` field was temporarily made optional (`tally?: EvidenceTally`, minimal,
+   uncompensated) → `typecheck` failed with `TS2578` (unused `@ts-expect-error`) at the frozen/tally
+   test, not the error it expects → reverted, clean again.
+2. `assertNeverAdaptationDecision`'s exhaustiveness mechanism was proven live on a **local five-kind
+   stand-in union** (never the real four-variant type): the `"bogus"` case was removed from the
+   stand-in switch → `typecheck` failed with the predicted `TS2345` at the exact call site → restored.
+3. `assertNeverAdaptationDecision`'s signature was temporarily edited to add a `humanOverride?: string`
+   parameter, a direct stand-in for the exact failure mode plan §4 (M5) names → the override-scan test
+   (`__tests__/architecture.test.ts`) failed immediately, flagging the injected parameter by file and
+   line → reverted, suite green again.
+4. **Round 2's own fix** (`tally?: never`/`distinctContextsNeeded?: never`/`revertedTo?: never`) was
+   itself removed in full and `typecheck` was re-run: all six of the new route-level
+   `@ts-expect-error` proofs failed together with `TS2578` (unused directive), confirming every one of
+   them is load-bearing on the fix, not decorative → the fix was restored and `typecheck`/`npm test`
+   both returned to clean (45/45 passing).
 
 ## Decision 2 — `hold.distinctContextsNeeded`: a required `number`, proven both missing and mistyped
 
@@ -153,6 +238,15 @@ code that does not exist yet.
 
 ## What this milestone does not claim
 
+- **`frozen`'s refusal of evidence-shaped fields (Decision 1) does not close a deliberate `as`/`as
+  unknown as` cast** — six of seven reported routes are closed at the type level; the seventh is a
+  disclosed residual with its own passing test and its own runtime guard
+  (`assertFrozenCitesNoEvidence`), not a claim that no code path can ever produce a contaminated
+  `frozen` value.
+- **`adopt`/`hold`/`revert` are not defended against carrying a stray field belonging to a different
+  variant** (e.g. `adopt` carrying `invariant`) — checked and confirmed possible via the same
+  non-literal routes, and deliberately left open because no plan refusal names that pairing as a
+  misrepresentation risk the way `frozen`+evidence is named (Decision 1).
 - `KnobId`/`KnobValue` free-text refusal is real only once a domain narrows the generic type
   parameters (Decision 3) — the unparameterized default does not refuse anything, and this is tested
   and disclosed, not silently left as a gap for a reader to find later.
