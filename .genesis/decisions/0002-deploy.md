@@ -60,6 +60,20 @@ absent — never a guessed or hardcoded SHA. A health endpoint whose one disting
 "proves what's live matches what's in the repo" would defeat its own purpose by fabricating that value
 when it doesn't have it.
 
+**A disclosed limitation, surfaced during this round's independent review of the ADR-only redeploy
+(occasion 4 in Decision 4 below), recorded here rather than left in a review transcript:**
+`app/api/health/route.ts` was byte-identical between occasions 3 and 4 — no code changed, only
+`README.md` and this ADR did — so the endpoint's own `detail` string could not serve as a fingerprint
+distinguishing the two builds the way it can for a change that touches the route file itself.
+Confirming occasion 4 actually served a fresh build, not a cached response from occasion 3, instead
+took the independent reviewer checking two weaker signals: `x-vercel-cache: MISS` together with
+`age: 0` and `cache-control: ...must-revalidate` on requests made seconds apart, plus a repo-wide grep
+confirming `VERCEL_GIT_COMMIT_SHA` is read exactly once, at `route.ts:159`, and never overridden
+anywhere else in the tree — so any response this endpoint serves can only report a SHA baked in at
+its own build, never a live-computed or cached-elsewhere value. This is materially weaker than a
+route-file content fingerprint. The next milestone that moves `HEAD` without touching `route.ts` will
+face the identical gap and should not assume the `detail` string will distinguish its builds either.
+
 ## Decision 3 — `vercel.json` pins `installCommand`/`buildCommand`; the framework-preset default was checked, found wrong, and overridden
 
 `next.config.ts` (landed at M1, for the same `.js`-suffixed-import reason `package.json`'s
@@ -84,16 +98,45 @@ the PR/report) shows `Running "install" command: npm ci...`, then `Running "npm 
 `> next build --webpack` → `▲ Next.js 16.3.5 (webpack)`, the same banner the local build prints — so
 the override is confirmed to have taken effect, not merely assumed from `vercel.json` being present.
 
-## Decision 4 — deploy from a clean, fully-committed tree at the branch's real `HEAD`, verified after the fact
+**A limit on this decision's own verifiability, disclosed rather than assumed away:** the `vercel
+link` output and the build-log lines quoted above are this account's own contemporaneous terminal
+record — a later reader, including an independent verifier without Vercel CLI or API access, cannot
+reproduce them directly and is trusting this transcript rather than re-running the same commands.
+What such a reader *can* independently confirm is the underlying conclusion this decision rests
+on — that the live deployment is genuinely webpack-built — by other means (this milestone's own
+independent review did so by diffing the served runtime chunk's bootstrap signature against a local
+webpack build and finding no `turbopack` string anywhere); the quoted CLI output itself is not, and
+cannot be made, independently reproducible after the fact.
+
+## Decision 4 — deploy from a clean, fully-committed tree at the branch's real `HEAD`, re-verified on every one of four deploys, not assumed to hold after the first
 
 A sibling project's M8 was rejected because `vercel deploy` ran against an uncommitted working tree:
 the CLI uploads the working tree as the build source regardless of `git` state, but
 `VERCEL_GIT_COMMIT_SHA` is read from `HEAD` at deploy time — so an uncommitted change makes the
-deployed *code* and the reported *SHA* disagree, silently. This milestone's deploy sequence was:
-commit everything on `m2-deploy` first, confirm `git status --short` is empty, run `vercel deploy`
-against that exact tree, then `curl` the live `/api/health` and diff its `commit` field against
-`git rev-parse HEAD` on the branch — recorded as passing in the PR/report, not merely assumed from the
-deploy command exiting zero.
+deployed *code* and the reported *SHA* disagree, silently. This milestone's deploy sequence — confirm
+`git status --short` is empty, run `vercel deploy`, then `curl` the live `/api/health` and diff its
+`commit` field against `git rev-parse HEAD` — was not run once and trusted to keep holding; **it was
+actually repeated on all four occasions `HEAD` moved on this branch**:
+
+1. **Initial deploy**, `HEAD 9fe1904` (after the health-endpoint and install/build-pin commits) —
+   tree confirmed clean, deployed, `curl`'d, `commit` field matched `9fe1904`.
+2. **Redeploy after the local-history rewrite** that fixed the token-leak false positive described in
+   Decision 5 below, new `HEAD 9a23862` — tree confirmed clean, deployed, `curl`'d, matched `9a23862`.
+3. **Redeploy after the README live-URL commit**, `HEAD ef3733f` — tree confirmed clean, deployed,
+   `curl`'d, matched `ef3733f`.
+4. **Redeploy after the Decision-3 rewrite this ADR itself records** (documentation only, no code
+   change), `HEAD 81a9b82` — tree confirmed clean, deployed, `curl`'d, matched `81a9b82`.
+
+The `git status --short`-clean check and the SHA-equality `curl` check were both re-run, from scratch,
+on all four occasions above — not performed once at the start and assumed to still hold for the rest.
+**What was *not* re-run on every occasion, disclosed here rather than left for a reader to assume:**
+the Vercel build-log grep confirming `npm ci` / `next build --webpack` / the webpack banner (Decision
+3) was fetched via `vercel inspect --logs` after occasions 1 and 2 only. Occasions 3 and 4 changed no
+build configuration — `vercel.json`, `package.json`, and `next.config.ts` were untouched in both; only
+`README.md` (occasion 3) and this ADR (occasion 4) changed — so the build log was not re-pulled for
+those two, and the SHA-equality check alone was relied on to confirm each deploy succeeded and served
+the right commit. A future redeploy that *does* change build configuration would need the log check
+repeated there too; this record does not claim it was, because it wasn't.
 
 ## Decision 5 — token handling
 
