@@ -7,5 +7,10 @@ export type { BehaviorDelta } from "./behavior-delta.js";
 export { ALL_EPISODE_OUTCOMES } from "./episode.js";
 export type { Episode, EpisodeOutcome } from "./episode.js";
 export type { EvidenceTally } from "./evidence-tally.js";
-export { assertNeverAdaptationDecision } from "./adaptation-decision.js";
-export type { AdaptationDecision } from "./adaptation-decision.js";
+export { assertNeverAdaptationDecision, assertFrozenCitesNoEvidence } from "./adaptation-decision.js";
+export type {
+  AdaptationDecision,
+  FrozenDecision,
+  UnexpectedEvidenceOnFrozen,
+  FrozenIntegrityResult,
+} from "./adaptation-decision.js";
