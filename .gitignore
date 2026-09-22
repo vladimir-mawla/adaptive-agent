@@ -49,3 +49,4 @@ coverage/
 # it can run under plain `node`; ignored from the start since it is always
 # regenerated, never committed.
 .demo-build/
+.env*
