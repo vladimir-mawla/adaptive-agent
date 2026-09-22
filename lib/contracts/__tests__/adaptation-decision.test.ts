@@ -15,12 +15,17 @@ const TALLY = { deltaId: DELTA, distinctContexts: 3, helped: 3, neutral: 0, harm
  * an assignment/argument/array-element site. Seven routes that are not
  * fresh literals all compiled clean against the original type. The fix
  * (adaptation-decision.ts: `tally?: never`, `distinctContextsNeeded?:
- * never`, `revertedTo?: never` on `frozen`) closes six of the seven;
- * the seventh (a deliberate `as unknown as` cast) is a disclosed,
- * intentional residual, not a gap this suite pretends is closed. See
- * adaptation-decision.ts's own "ROUND 2" header for the full incident.
+ * never`, `revertedTo?: never` on `frozen`) closes ALL SEVEN of the
+ * originally reported routes, including the `satisfies`-based one
+ * (`TS1360`). A DIFFERENT construct, never one of the seven reported — an
+ * explicit `as`/`as unknown as` cast, or an implicit `any` value arriving
+ * from a library call such as `JSON.parse` — remains open, as a disclosed
+ * example of a language-level property (every TypeScript type falls to a
+ * deliberate cast or an `any`, not something particular to this design),
+ * not a gap this suite pretends is closed. See adaptation-decision.ts's
+ * own "ROUND 2" header for the full incident.
  */
-describe("AdaptationDecision.frozen refuses tally/distinctContextsNeeded/revertedTo through every route tested except a deliberate cast", () => {
+describe("AdaptationDecision.frozen refuses tally/distinctContextsNeeded/revertedTo through all seven reported routes", () => {
   it("constructs a valid frozen decision with no evidence fields", () => {
     const frozen: AdaptationDecision = { kind: "frozen", deltaId: DELTA, invariant: INVARIANT };
     expect(frozen.kind).toBe("frozen");
@@ -104,13 +109,21 @@ describe("AdaptationDecision.frozen refuses tally/distinctContextsNeeded/reverte
     expect(arr).toBeDefined();
   });
 
-  it("DISCLOSED RESIDUAL: a deliberate `as unknown as` cast still bypasses this, and is not claimed to be closed", () => {
-    // Deliberately NOT a @ts-expect-error: this is meant to compile clean,
-    // pinning the one route the ROUND 2 fix does not and cannot close, so
-    // the gap is documented rather than silently rediscoverable later.
-    // assertFrozenCitesNoEvidence (tested below) is the runtime guard this
-    // residual requires — recorded as a build requirement for M5 in
-    // .genesis/decisions/0001-contracts.md.
+  it("DOCUMENTATION/EXAMPLE, NOT A REGRESSION PIN: a deliberate `as unknown as` cast bypasses this, and is not claimed to be closed", () => {
+    // NOT a regression test: `x as unknown as Y` is unconditionally
+    // permitted by TypeScript between any two object shapes, so no change
+    // to this codebase could ever make this line fail to compile — it
+    // pins an immutable property of the language, not a fragile fact
+    // about this file. It exists purely to illustrate, with a real,
+    // running example, the one construct L4 VERIFY's own reported list
+    // did NOT include and that this milestone does not claim to close at
+    // the type level (see adaptation-decision.ts's "A DIFFERENT,
+    // UNREPORTED RESIDUAL" paragraph). This test carries no ts-expect-error
+    // marker (note the deliberately broken directive spelling in this
+    // sentence, so this comment itself is never mistaken for one) since
+    // it is meant to compile clean. assertFrozenCitesNoEvidence (tested
+    // below) is the runtime guard this residual requires — recorded as a
+    // build requirement for M5 in .genesis/decisions/0001-contracts.md.
     const cast = sneaky as unknown as AdaptationDecision;
     expect(cast.kind).toBe("frozen");
     expect((cast as typeof sneaky).tally).toEqual(TALLY);

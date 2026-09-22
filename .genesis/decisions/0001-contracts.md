@@ -37,7 +37,7 @@ const sneaky = { kind: "frozen" as const, deltaId: D, invariant: I, tally: T };
 const a: AdaptationDecision = sneaky;            // intermediate binding
 const b: AdaptationDecision = { ...sneaky };     // spread
 function f(): AdaptationDecision { return sneaky; }
-const c = sneaky satisfies object as AdaptationDecision;
+const c = sneaky satisfies AdaptationDecision;   // satisfies check against the real target type
 const d: AdaptationDecision = identity(sneaky);  // generic helper
 const e: AdaptationDecision = Object.assign({}, sneaky);
 const arr: AdaptationDecision[] = [sneaky];
@@ -53,17 +53,28 @@ trusting it.
 `revertedTo?: never` explicitly (all three evidence-shaped fields, not just `tally` — see "why all
 three" below). This moves the check from excess-property checking (literal-site-only) to ordinary
 assignability (checked at every site, literal or not): a real `EvidenceTally`/`number`/`KnobValue` is
-never assignable to `never`, so the error now fires at routes 1, 2, 3, 5, 6, 7 above.
+never assignable to `never`, so the error now fires at all seven routes above.
 
-**Verified route by route, not just once:** each of the six closable routes was re-run against the
-fixed type and confirmed to fail with `TS2322` ("not assignable to type 'never'"/"'undefined'"); each
-now has its own `@ts-expect-error` proof in `__tests__/adaptation-decision.test.ts` ("TYPE-LEVEL route
-1/6" through "6/6"), built against a single `sneaky` value carrying all three evidence fields at once
-so a narrower fix touching only one field could not pass silently. Route 4 (the explicit
-`satisfies object as AdaptationDecision` cast, or the simpler `as unknown as AdaptationDecision`) was
-re-run and still compiles clean — expected, not accidental, and pinned as a *passing* (not
-`@ts-expect-error`) test named "DISCLOSED RESIDUAL" so the gap is documented rather than
-silently rediscoverable.
+**Verified route by route, not just once — all seven closed, not six of seven:** routes 1, 2, 3, 5, 6,
+7 were re-run against the fixed type and confirmed to fail with `TS2322` ("not assignable to type
+'never'"/"'undefined'"); each of those six now has its own `@ts-expect-error` proof in
+`__tests__/adaptation-decision.test.ts` ("TYPE-LEVEL route 1/6" through "6/6"), built against a single
+`sneaky` value carrying all three evidence fields at once so a narrower fix touching only one field
+could not pass silently. Route 4 (`sneaky satisfies AdaptationDecision`) was re-run separately and now
+fails with the distinct `TS1360` ("does not satisfy the expected type") — **closed as well, making all
+seven of the originally reported routes closed, not six of seven** as an earlier draft of this ADR
+claimed. That earlier draft mis-attributed the surviving construct to L4 VERIFY's own report by
+quoting `sneaky satisfies object as AdaptationDecision` (a `satisfies`-against-`object` check, which is
+trivially true, followed by an explicit `as` cast) as if it were the reported route itself; the
+`as` at the end is what actually let that specific line keep compiling, not anything about
+`satisfies`. The corrected, accurate residual — an explicit `as`/`as unknown as` cast, or an implicit
+`any` value from a library call such as `JSON.parse` — was never one of the seven routes L4 VERIFY
+reported; it is pinned as a *passing* (not `@ts-expect-error`) test explicitly labeled
+"DOCUMENTATION/EXAMPLE, NOT A REGRESSION PIN" rather than "DISCLOSED RESIDUAL" — `x as unknown as Y` is
+unconditionally permitted between any two object shapes in TypeScript, so no change to this codebase
+could ever make that test's assertion fail to compile; it pins an immutable language property, not a
+fragile fact about this file's own code, and is documented as such rather than left to be mistaken for
+a regression guard.
 
 **Why all three evidence fields, not just `tally` (L4 VERIFY's report named only `tally`):** the
 identical empirical check was run for `distinctContextsNeeded` and `revertedTo` leaking onto a
@@ -93,33 +104,46 @@ on its `warn` variant to block the identical class of leakage). This scope bound
 passing "HONEST LIMIT" test in `__tests__/adaptation-decision.test.ts`, not left silent.
 
 **The claim, restated once, at exactly the strength that survives:** a `frozen` decision cannot be
-constructed carrying `tally`, `distinctContextsNeeded`, or `revertedTo` through any route that does not
-name `AdaptationDecision` (or an equivalent cast target) explicitly and in cleartext at the
-construction site — a fresh literal, an intermediate binding, a spread, a function return, a generic
-helper, `Object.assign`, and an array element, all six checked directly. It *can* still be constructed
-that way through a deliberate `as`/`as unknown as` cast. This is the same disclosed residual
+constructed carrying `tally`, `distinctContextsNeeded`, or `revertedTo` through any of the seven routes
+L4 VERIFY reported — a fresh literal, an intermediate binding, a spread, a function return, a
+`satisfies` check, a generic helper, `Object.assign`, or an array element, all seven checked directly.
+It *can* still be constructed through a route no one reported: a deliberate `as`/`as unknown as` cast,
+or an implicit `any` value arriving from a library call such as `JSON.parse` (an `any`-typed value
+erases the check with no cast keyword anywhere — not specific to a visible cast, and not specific to
+this design: every TypeScript type falls to it). This is the same disclosed residual
 `agent-control-tower`'s own `HumanId` names and does not claim to solve: no TypeScript design stops a
-deliberate, visible cast — closing it would mean rejecting a language feature, not writing a better
+deliberate cast or an `any` — closing it would mean rejecting language features, not writing a better
 type.
 
 **Is the resulting guarantee sufficient for M5, or must `arbitrate` carry its own runtime check?**
-**`arbitrate` must call a runtime check.** The type-level fix closes six of seven routes but cannot
-close a deliberate cast, and `arbitrate` (M5, unbuilt; plan §4's own signature is
-`arbitrate(delta, tally, gateResult, priorState)`) is exactly the function most likely to assemble a
-`frozen`-shaped return value from a shared intermediate representation where a cast could plausibly be
-used to reconcile shapes. `assertFrozenCitesNoEvidence` (new in this round, `adaptation-decision.ts`)
-is the parallel runtime guard, built now in M1 rather than deferred — the same shape
-`agent-control-tower`'s `assertValidHaltForced` takes for its own analogous residual: it inspects a
-`FrozenDecision` value for a populated `tally`/`distinctContextsNeeded`/`revertedTo` at runtime and
-returns a typed `{ ok: false, error }` if any is present, rather than throwing directly (so a caller
-must inspect the result, not just avoid catching an exception). **This is recorded here as a BUILD
-REQUIREMENT for M5: `arbitrate` must call `assertFrozenCitesNoEvidence` on any `frozen` decision it is
-about to return or forward, and refuse to trust one that fails it** — not left to be rediscovered when
-M5 is built. What this function does NOT do, stated at its true strength: it cannot stop a `frozen`
-value from being constructed with a populated evidence field in the first place, and it cannot verify
-that a *forged but well-formed* evidence field (e.g. a fabricated `EvidenceTally` shape) is genuine —
-it only checks presence, the same honest, narrow scope `assertValidHaltForced` claims for itself
-against forged-but-well-formed `HumanId`/`ConflictId` values.
+**`arbitrate` must call a runtime check.** The type-level fix closes all seven reported routes but
+cannot close a deliberate cast or an implicit `any` from a library call, and `arbitrate` (M5, unbuilt;
+plan §4's own signature is `arbitrate(delta, tally, gateResult, priorState)`) is exactly the function
+most likely to assemble a `frozen`-shaped return value from a shared intermediate representation where
+a cast, or a value round-tripped through JSON, could plausibly be used to reconcile shapes.
+`assertFrozenCitesNoEvidence` (new in this round, `adaptation-decision.ts`) is the parallel runtime
+guard, built now in M1 rather than deferred — the same shape `agent-control-tower`'s
+`assertValidHaltForced` takes for its own analogous residual: it inspects a `FrozenDecision` value for
+a populated `tally`/`distinctContextsNeeded`/`revertedTo` at runtime and returns a typed
+`{ ok: false, error }` if any is present, rather than throwing directly (so a caller must inspect the
+result, not just avoid catching an exception), and it catches a contaminated value regardless of which
+entry path (cast or `any`) produced it. **This is recorded here as a BUILD REQUIREMENT for M5:
+`arbitrate` must call `assertFrozenCitesNoEvidence` on any `frozen` decision it is about to return or
+forward, and refuse to trust one that fails it** — not left to be rediscovered when M5 is built. What
+this function does NOT do, stated at its true strength: it cannot stop a `frozen` value from being
+constructed with a populated evidence field in the first place, and it cannot verify that a *forged but
+well-formed* evidence field (e.g. a fabricated `EvidenceTally` shape) is genuine — it only checks
+presence, the same honest, narrow scope `assertValidHaltForced` claims for itself against
+forged-but-well-formed `HumanId`/`ConflictId` values.
+
+**One forward note for M5/M8, low severity, not a defect, recorded here as requested:** everything
+above concerns a decision being *constructed* with a foreign field, closed for `frozen` by the
+type/runtime-guard pair above. A milder exposure remains if a decision is ever serialized wholesale —
+logged verbatim, or hedged straight to a UI (M8, unbuilt) — rather than switched on `kind` first: a
+stray foreign field on any variant (including the ones this milestone deliberately does not mirror
+`?: never` onto, see below) would render or log visibly even though no consumer that correctly checks
+`kind` before reading a variant-specific field is ever misled by it. Named here so M8 does not
+rediscover it as a surprise; not a defect this milestone's own scope covers fixing.
 
 **Falsifiability, run for real at every step above, not just described once:**
 1. `frozen`'s `tally` field was temporarily made optional (`tally?: EvidenceTally`, minimal,
@@ -239,10 +263,11 @@ code that does not exist yet.
 ## What this milestone does not claim
 
 - **`frozen`'s refusal of evidence-shaped fields (Decision 1) does not close a deliberate `as`/`as
-  unknown as` cast** — six of seven reported routes are closed at the type level; the seventh is a
-  disclosed residual with its own passing test and its own runtime guard
-  (`assertFrozenCitesNoEvidence`), not a claim that no code path can ever produce a contaminated
-  `frozen` value.
+  unknown as` cast, or an implicit `any` value from a library call such as `JSON.parse`** — all seven
+  of L4 VERIFY's originally reported routes are closed at the type level; this different, unreported
+  construct is a disclosed residual with its own passing documentation/example test (not a regression
+  pin — see Decision 1) and its own runtime guard (`assertFrozenCitesNoEvidence`), not a claim that no
+  code path can ever produce a contaminated `frozen` value.
 - **`adopt`/`hold`/`revert` are not defended against carrying a stray field belonging to a different
   variant** (e.g. `adopt` carrying `invariant`) — checked and confirmed possible via the same
   non-literal routes, and deliberately left open because no plan refusal names that pairing as a

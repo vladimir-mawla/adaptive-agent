@@ -68,7 +68,11 @@ import type { EvidenceTally } from "./evidence-tally.js";
  *      (intermediate binding)
  *   2. `const b: AdaptationDecision = { ...sneaky };` (spread)
  *   3. `function f(): AdaptationDecision { return sneaky; }` (return)
- *   4. `sneaky satisfies object as AdaptationDecision` (double cast)
+ *   4. `sneaky satisfies AdaptationDecision` (a `satisfies` check against
+ *      the real target type — not the excess-property-check-only route a
+ *      fresh literal takes, since `satisfies` validates the ALREADY-BUILT
+ *      `sneaky` value's inferred type for assignability, the same
+ *      assignability question as routes 1/2/3/5/6/7 below)
  *   5. `const d: AdaptationDecision = identity(sneaky);` (generic helper)
  *   6. `const e: AdaptationDecision = Object.assign({}, sneaky);`
  *   7. `const arr: AdaptationDecision[] = [sneaky];` (array element)
@@ -83,12 +87,16 @@ import type { EvidenceTally } from "./evidence-tally.js";
  * CHECKING (literal-site-only) to ORDINARY ASSIGNABILITY (checked at
  * every site, literal or not): a real `EvidenceTally`/`number`/`KnobValue`
  * is never assignable to `never`, so the error now fires at every one of
- * routes 1, 2, 3, 5, 6, 7 above — verified for real, again, one route at a
- * time, against the SAME scratch reproduction, all six now failing to
- * compile with `TS2322` ("not assignable to type 'never'" /
- * "'undefined'"). Route 4, the explicit double cast, is untouched by this
- * fix and still compiles — expected, and named below, not silently
- * accepted.
+ * all seven routes above — verified for real, again, one route at a time,
+ * against the SAME scratch reproduction. Routes 1, 2, 3, 5, 6, 7 now fail
+ * with `TS2322` ("not assignable to type 'never'"/"'undefined'"); route 4
+ * (`satisfies`) now fails with the distinct `TS1360` ("does not satisfy
+ * the expected type"), TypeScript's own diagnostic for a failed
+ * `satisfies` check. **All seven of the originally reported routes are
+ * closed — not six of seven.** A different, unreported construct — an
+ * explicit `as`/`as unknown as` cast, never one of the seven L4 VERIFY
+ * listed — is what actually remains open, named honestly below rather
+ * than conflated with a reported route that is now closed.
  *
  * WHY ALL THREE FIELDS, NOT JUST `tally` (L4 VERIFY's own literal
  * report): the SAME empirical check was run for `distinctContextsNeeded`
@@ -135,46 +143,75 @@ import type { EvidenceTally } from "./evidence-tally.js";
  * demonstrating `adopt` can still carry a stray `invariant` field via a
  * non-literal route today.
  *
- * THE ONE RESIDUAL ROUTE NAMED AT ITS TRUE STRENGTH: route 4 above (a
- * double cast, `sneaky satisfies object as AdaptationDecision`, or the
- * simpler `sneaky as unknown as AdaptationDecision`) still compiles clean
- * after this fix — confirmed, not assumed, by the same scratch
- * reproduction. This is not a gap this fix failed to close; it is the
- * same residual `agent-control-tower`'s own `human-id.ts` names for its
- * `HumanId` brand and does not claim to solve: "no TypeScript design can
- * stop a deliberate cast." `as`/`as unknown as` is a designed escape
- * hatch precisely because TypeScript's soundness is deliberately partial
- * — closing it would require rejecting a language feature, not writing a
+ * ALL SEVEN ORIGINALLY REPORTED ROUTES ARE CLOSED — INCLUDING ROUTE 4
+ * (`satisfies`): `sneaky satisfies AdaptationDecision` was re-tested
+ * directly against the fixed type and fails with `TS1360`, confirmed, not
+ * assumed. There is no reported route from L4 VERIFY's list that still
+ * bypasses this fix.
+ *
+ * A DIFFERENT, UNREPORTED RESIDUAL — AN EXPLICIT CAST, OR AN IMPLICIT
+ * `any` FROM A LIBRARY CALL: `sneaky as unknown as AdaptationDecision`
+ * still compiles clean, and so does `JSON.parse(JSON.stringify(sneaky))`
+ * assigned directly to a `FrozenDecision`-typed binding (`JSON.parse`
+ * returns `any`, which is assignable to anything, with no cast keyword
+ * anywhere). Neither of these was among the seven routes L4 VERIFY
+ * reported — they are named here honestly as a *different* observation,
+ * not conflated with a reported bypass that happens to still work. Both
+ * are the same well-known, language-level property: a deliberate `as`/`as
+ * unknown as` cast, and an implicit `any` arriving from a library
+ * boundary, bypass EVERY TypeScript type, not something particular to
+ * this design — the same residual `agent-control-tower`'s own
+ * `human-id.ts` names for its `HumanId` brand and does not claim to
+ * solve: "no TypeScript design can stop a deliberate cast." Closing it
+ * would mean rejecting language features (`as`, `any`), not writing a
  * better type.
  *
  * THE CLAIM, RESTATED AT EXACTLY THE STRENGTH THAT SURVIVES: a `frozen`
  * decision cannot be constructed carrying `tally`, `distinctContextsNeeded`,
- * or `revertedTo` through any route that does not name `AdaptationDecision`
- * (or an equivalent cast target) explicitly and in cleartext at the
- * construction site — covering a fresh literal, an intermediate binding,
- * a spread, a function return, a generic helper, `Object.assign`, and an
- * array element, all six checked directly, not inferred from one. It CAN
- * still be constructed that way through a deliberate `as`/`as unknown as`
- * cast — a residual this project does not claim to close at the type
- * level, and does not need to: see `assertFrozenCitesNoEvidence` below,
- * the parallel RUNTIME guard for exactly this residual, matching
+ * or `revertedTo` through any of the seven routes L4 VERIFY reported —
+ * a fresh literal, an intermediate binding, a spread, a function return,
+ * a `satisfies` check, a generic helper, `Object.assign`, or an array
+ * element, all seven checked directly, not inferred from one. It CAN
+ * still be constructed through a route no one reported: a deliberate
+ * `as`/`as unknown as` cast, or an implicit `any` value arriving from a
+ * library call such as `JSON.parse` — a residual this project does not
+ * claim to close at the type level, and does not need to: see
+ * `assertFrozenCitesNoEvidence` below, the parallel RUNTIME guard for
+ * exactly this residual (it catches a contaminated value regardless of
+ * which of these entry paths produced it), matching
  * `agent-control-tower`'s own `assertValidHaltForced` precedent for the
- * identical situation (a central commitment mostly closed by types, with
- * one cast-shaped residual the type system cannot reach, closed instead
- * by a runtime check a consumer is expected to call).
+ * identical situation (a central commitment closed by types against every
+ * reported route, with a cast/`any`-shaped residual the type system
+ * cannot reach by design, closed instead by a runtime check a consumer is
+ * expected to call).
  *
  * ANSWERING L4 VERIFY'S CLOSING QUESTION DIRECTLY: is the resulting
  * guarantee sufficient for M5, or must `arbitrate` carry its own runtime
  * check? **`arbitrate` must call a runtime check** — the type-level fix
- * closes six of seven routes but cannot close a deliberate cast, and
- * `arbitrate` (M5, unbuilt) is exactly the function most likely to
- * receive a `frozen`-shaped value assembled from a shared intermediate
- * representation (gate result + tally, `.genesis/PLAN.md` §4's own
- * signature: `arbitrate(delta, tally, gateResult, priorState)`) where a
- * cast could plausibly be used to reconcile shapes. `assertFrozenCitesNoEvidence`
+ * closes all seven reported routes but cannot close a deliberate cast or
+ * an implicit `any` from a library call, and `arbitrate` (M5, unbuilt) is
+ * exactly the function most likely to receive a `frozen`-shaped value
+ * assembled from a shared intermediate representation (gate result +
+ * tally, `.genesis/PLAN.md` §4's own signature:
+ * `arbitrate(delta, tally, gateResult, priorState)`) where a cast, or a
+ * value that passed through JSON serialization, could plausibly be used
+ * to reconcile shapes. `assertFrozenCitesNoEvidence`
  * (below) is built now, in M1, for exactly that call — recorded as a
  * BUILD REQUIREMENT for M5 in `.genesis/decisions/0001-contracts.md`,
  * not left to be rediscovered.
+ *
+ * ONE FORWARD NOTE FOR M5/M8, LOW SEVERITY, NOT A DEFECT: everything
+ * above concerns a decision being CONSTRUCTED with a foreign field, and
+ * is closed for `frozen` by the type/runtime-guard pair above. A
+ * different, milder exposure exists if a decision is ever serialized
+ * WHOLESALE — logged verbatim, or handed straight to a UI (M8, unbuilt) —
+ * rather than switched on `kind` first: a stray foreign field on any
+ * variant (including the ones this milestone deliberately does not
+ * mirror `?: never` onto — see above) would render or log visibly even
+ * though no consumer that correctly checks `kind` before reading a
+ * variant-specific field is ever misled by it. Worth one line here so M8
+ * does not rediscover it as a surprise; not a defect this milestone's own
+ * scope covers fixing.
  *
  * NO OVERRIDE PARAMETER ANYWHERE IN THIS FILE, AND NONE ANYWHERE UNDER
  * `lib/contracts/**` — CHECKED, NOT JUST ASSERTED: `__tests__/
@@ -262,17 +299,21 @@ export type FrozenIntegrityResult =
   | { readonly ok: false; readonly error: UnexpectedEvidenceOnFrozen };
 
 /**
- * THE PARALLEL RUNTIME GUARD FOR THE ONE RESIDUAL ROUTE NAMED ABOVE (a
- * deliberate `as`/`as unknown as` cast) — the same shape
- * `agent-control-tower`'s `assertValidHaltForced` is for its own analogous
- * residual. The type system closes every route that does not explicitly
- * name a cast target in cleartext; this function is what a caller that
- * received a `FrozenDecision` from somewhere it does not fully control
- * (M5's `arbitrate`, unbuilt, is the named consumer — see this file's
- * "ANSWERING L4 VERIFY'S CLOSING QUESTION" paragraph above) can call to
- * catch the one thing the type checker cannot: a value that arrived via a
- * cast carrying a real, populated evidence field despite its declared
- * type saying that field is `never`.
+ * THE PARALLEL RUNTIME GUARD FOR THE RESIDUAL NAMED ABOVE (a deliberate
+ * `as`/`as unknown as` cast, OR an implicit `any` value arriving from a
+ * library call such as `JSON.parse` — not specific to an explicit,
+ * visible cast keyword; an `any`-typed value erases the check with no
+ * cast syntax anywhere) — the same shape `agent-control-tower`'s
+ * `assertValidHaltForced` is for its own analogous residual. The type
+ * system closes every one of the seven routes L4 VERIFY reported; it does
+ * not, and cannot, close a route where the value's own type is `any` at
+ * the assignment site, however that `any` arose. This function is what a
+ * caller that received a `FrozenDecision` from somewhere it does not
+ * fully control (M5's `arbitrate`, unbuilt, is the named consumer — see
+ * this file's "ANSWERING L4 VERIFY'S CLOSING QUESTION" paragraph above)
+ * can call to catch the one thing the type checker cannot, regardless of
+ * entry path: a value carrying a real, populated evidence field despite
+ * its declared type saying that field is `never`.
  *
  * WHAT THIS DOES NOT DO, STATED AT ITS TRUE STRENGTH: it does not, and
  * cannot, stop a `frozen` value from being constructed with a populated
