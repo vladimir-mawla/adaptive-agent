@@ -108,35 +108,41 @@ independent review did so by diffing the served runtime chunk's bootstrap signat
 webpack build and finding no `turbopack` string anywhere); the quoted CLI output itself is not, and
 cannot be made, independently reproducible after the fact.
 
-## Decision 4 — deploy from a clean, fully-committed tree at the branch's real `HEAD`, re-verified on every one of four deploys, not assumed to hold after the first
+## Decision 4 — deploy from a clean, fully-committed tree at the branch's real `HEAD`, the same check re-run on every deploy this branch has had, stated as a rule rather than a count
 
 A sibling project's M8 was rejected because `vercel deploy` ran against an uncommitted working tree:
 the CLI uploads the working tree as the build source regardless of `git` state, but
 `VERCEL_GIT_COMMIT_SHA` is read from `HEAD` at deploy time — so an uncommitted change makes the
-deployed *code* and the reported *SHA* disagree, silently. This milestone's deploy sequence — confirm
-`git status --short` is empty, run `vercel deploy`, then `curl` the live `/api/health` and diff its
-`commit` field against `git rev-parse HEAD` — was not run once and trusted to keep holding; **it was
-actually repeated on all four occasions `HEAD` moved on this branch**:
+deployed *code* and the reported *SHA* disagree, silently. **Every deploy on this branch has followed
+the same sequence, not just the first:** commit everything, confirm `git status --short` is empty,
+run `vercel deploy` against that exact tree, then `curl` the live `/api/health` and diff its `commit`
+field against `git rev-parse HEAD`. This is stated as a rule rather than a fixed count of occasions
+deliberately — an earlier draft of this decision enumerated "four" deploys and was already wrong
+about its own count by the time it was committed, for the identical reason Decision 3 was once wrong:
+documentation describing a moving target, written down as if the target had stopped moving. Naming a
+count here would only relocate that mistake, not fix it, since committing this very sentence moves
+`HEAD` again.
 
-1. **Initial deploy**, `HEAD 9fe1904` (after the health-endpoint and install/build-pin commits) —
-   tree confirmed clean, deployed, `curl`'d, `commit` field matched `9fe1904`.
-2. **Redeploy after the local-history rewrite** that fixed the token-leak false positive described in
-   Decision 5 below, new `HEAD 9a23862` — tree confirmed clean, deployed, `curl`'d, matched `9a23862`.
-3. **Redeploy after the README live-URL commit**, `HEAD ef3733f` — tree confirmed clean, deployed,
-   `curl`'d, matched `ef3733f`.
-4. **Redeploy after the Decision-3 rewrite this ADR itself records** (documentation only, no code
-   change), `HEAD 81a9b82` — tree confirmed clean, deployed, `curl`'d, matched `81a9b82`.
+The deploys are enumerable directly from the branch's own history rather than restated as a number
+here: the first four are `9fe1904`, `9a23862`, `ef3733f`, and `81a9b82`. Any deploy after those is a
+**documentation-only redeploy**, made solely to keep the live endpoint's reported commit truthful
+about whichever commit most recently described the deploys before it — not itemised individually,
+because itemising one would itself be a commit that moves `HEAD` and calls for the next one, an
+infinite regress rather than a fact worth recording per occasion. What *is* a fact worth recording,
+and stays true regardless of how many such redeploys accumulate: a documentation-only redeploy changes
+no application code and no build configuration, so it carries no risk this decision's own rule doesn't
+already cover — the clean-tree check and the SHA-equality check still run every time, and that is what
+keeps the live SHA honest no matter how many more of these there are.
 
-The `git status --short`-clean check and the SHA-equality `curl` check were both re-run, from scratch,
-on all four occasions above — not performed once at the start and assumed to still hold for the rest.
 **What was *not* re-run on every occasion, disclosed here rather than left for a reader to assume:**
 the Vercel build-log grep confirming `npm ci` / `next build --webpack` / the webpack banner (Decision
-3) was fetched via `vercel inspect --logs` after occasions 1 and 2 only. Occasions 3 and 4 changed no
-build configuration — `vercel.json`, `package.json`, and `next.config.ts` were untouched in both; only
-`README.md` (occasion 3) and this ADR (occasion 4) changed — so the build log was not re-pulled for
-those two, and the SHA-equality check alone was relied on to confirm each deploy succeeded and served
-the right commit. A future redeploy that *does* change build configuration would need the log check
-repeated there too; this record does not claim it was, because it wasn't.
+3) was fetched via `vercel inspect --logs` after the first two deploys (`9fe1904`, `9a23862`) only.
+Every deploy from the third (`ef3733f`) onward has changed no build configuration — verified directly
+against `git log` on `vercel.json`, `package.json`, and `next.config.ts`, none of which has a commit
+after `9a23862` — so the build log was not re-pulled for any of them, and the SHA-equality check alone
+was relied on to confirm each one succeeded and served the right commit. A future deploy that *does*
+change build configuration would need the log check repeated there too; this record does not claim
+that one did, because none since `9a23862` has.
 
 ## Decision 5 — token handling
 
