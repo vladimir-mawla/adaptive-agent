@@ -158,6 +158,36 @@ context (the FIRST read, captured once) and that the getter was invoked exactly 
    `TallyResult`, confirmed directly in the failure output (`expected [Function] to not throw... but
    'Error: hostile getter: deltaId' was thrown`). All 211 other tests stayed green. The file was
    restored byte-for-byte and the suite returned to 215/215.
+3. **`tally` was gutted entirely** — the whole body replaced with a single unconditional
+   `return { ok: true, tally: { deltaId, distinctContexts: 0, helped: 0, neutral: 0, harmed: 0 } }`,
+   ignoring `episodes` altogether — and the suite re-run: **196 of 215 tests still passed**, a number
+   that would be alarming taken alone and is only meaningful decomposed, not just reported.
+   - **45** are M1/M2's own tests, which never call `tally` at all and could not have detected this
+     regardless of what `tally` does.
+   - **150**, all inside `order-independence.test.ts`, pass against a constant function **by design,
+     not by a blind spot in this milestone's suite**: these are the 150 per-scenario property-based
+     "any shuffle of THIS episode set produces the SAME `TallyResult`" checks, and a function that
+     ignores its input entirely trivially satisfies "same input, different orders, same result" for
+     every ordering — correctly, since that is genuinely all those 150 checks claim.
+     Order-independence and correctness are two different properties, proven by two different
+     mechanisms on purpose; these 150 were never the ones responsible for catching a
+     wrong-but-order-stable answer.
+   - The remaining **19 all failed, correctly** — every test, in any file, that asserts an actual
+     count, a specific `distinctContexts` value, a specific typed failure `kind`, or a specific number
+     of getter reads, rather than only cross-shuffle consistency: 6 in `tally.test.ts` (every test
+     except the empty-episodes case — see below), all 10 in `hostile-input.test.ts`, and 3 in
+     `order-independence.test.ts` itself — its exhaustive-120-permutation test and its 50-storm
+     shuffle test each assert a concrete expected tally *before* looping over shuffles, and its own
+     generator-sanity test asserts `distinctContexts > 1` was observed somewhere across 150 scenarios;
+     a constant all-zero tally fails every one of those three embedded assertions even though the
+     surrounding shuffle-consistency check in the same test would have passed. 6 + 10 + 3 = 19.
+   - **One test did not fail despite asserting a real value — a known, checked exception, not a silent
+     gap:** `tally.test.ts`'s "an empty episode list tallies to all zeros" case has an expected value
+     that is itself all-zeros, so it is one of the rare inputs on which the gutted function and the
+     real function coincide by coincidence — it was never capable of distinguishing this sabotage from
+     correct behavior, and is counted among the 196, not misrepresented as one of the 19.
+
+   The file was restored byte-for-byte and the suite returned to 215/215.
 
 ## What this milestone does not claim
 
@@ -175,6 +205,56 @@ context (the FIRST read, captured once) and that the getter was invoked exactly 
   value (a syntactically valid string `contextId` that does not correspond to any real context) is
   genuine.** This is the same honest, narrow scope `0001-contracts.md`'s `assertFrozenCitesNoEvidence`
   already discloses for itself: presence/shape checking, not provenance checking.
+- **A DIFFERENT, MORE DANGEROUS GAP THAN THE ONE ABOVE, NAMED EXPLICITLY: `tally` treats two
+  `contextId` strings that name the SAME real-world context, but are spelled inconsistently, as
+  DISTINCT contexts, and cannot do otherwise.** The bullet above is about an id pointing at nothing
+  real (forged-but-well-formed). This one is the opposite direction and is the one that actually
+  threatens the project's own spine: **the same real context, written inconsistently, counts as
+  several.** `distinctContexts` is `Set<ContextId>.size`, and JavaScript's `Set`/`===` equality is
+  exact-codepoint-sequence equality — confirmed directly, not assumed (`node -e` against the four
+  concrete shapes below, each pair visually or semantically "the same" id, each pair `!== `/counted as
+  distinct):
+  - **Case** — `"Ticket-42"` vs `"ticket-42"`.
+  - **Leading/trailing whitespace** — `"ticket-42"` vs `"ticket-42 "` (a trailing space).
+  - **Zero-width characters** — `"ticket-42"` vs `"ticket-42" + "\u200B"` (a trailing zero-width
+    space, `U+200B`, invisible in almost any renderer — written here as an escaped literal, not
+    pasted as the real invisible character, so this document itself stays legible and grep-able
+    rather than silently carrying an invisible codepoint).
+  - **Unicode normalization form** — `"caf\u00e9"` (NFC — é as the single codepoint `U+00E9`)
+    vs `"cafe\u0301"` (NFD — a plain `e` followed by the combining acute accent `U+0301`) — two
+    different codepoint sequences that render identically and are canonically equivalent Unicode,
+    yet `nfc === nfd` is `false` in plain JavaScript, and only equal after both are explicitly
+    `.normalize("NFC")`-ed, which nothing in this codebase does.
+
+  **The concrete consequence, stated at exactly the strength this deserves:** a single real ticket,
+  logged as three or four spellings of its own id across three or four episodes — no forging, no
+  hostile getter, no Proxy, just one caller (or one integration, or one copy-paste) being
+  inconsistent — clears `distinctContexts: 3` or `4` exactly as if three or four genuinely independent
+  contexts had reported in. That is precisely the "one loud incident repeated" scenario this entire
+  project exists to refuse (plan §1), reached without an attacker doing anything adversarial at all.
+
+  **`tally` cannot close this, by design, not by omission — and this milestone deliberately does NOT
+  add normalization to close it.** `lib/contracts/ids.ts` is FROZEN, and its own header states the
+  design choice directly: `ContextId` (and its siblings) are "opaque identity tokens... not values
+  with a range or a grammar to validate," with "NO PARSERS." Folding case, trimming whitespace,
+  stripping zero-width characters, or calling `.normalize()` before building the `Set` would mean
+  `lib/evidence` inventing a canonicalization policy for an id type that `lib/contracts` deliberately
+  declares has none — exactly the "grow parsing machinery onto an opaque token" mistake this project's
+  own series has already paid for twice (naming a domain vocabulary at M1 that belonged to M6;
+  guessing at a clock/ordering policy `timestamp.ts` explicitly declines to have). The correct owner of
+  id canonicalization is whichever caller mints `ContextId` values in the first place (a future
+  domain's own ticket-ingestion code, unbuilt) — not this pure counting function, and not this
+  milestone.
+
+  **Recorded here as a concrete M7 failure-suite candidate, so M7's builder finds it rather than
+  rediscovering it:** a case belongs in `tests/failures/**` demonstrating exactly this — three episodes
+  whose `contextId`s are the same real ticket spelled three different ways (e.g. differing only in
+  case, or one with a trailing zero-width space) reported to `tally`, and the resulting
+  `EvidenceTally.distinctContexts` shown to reach whatever bar M5 sets for `adopt`, purely from
+  spelling drift. Per the plan's own §4 house rule for this suite, that case's file header should state
+  plainly that it is *disclosing* a real, unsolved gap, not proving a refusal — matching the shape
+  already set by failure-suite case 8 (cumulative drift) rather than case 1 (same-context replay
+  storm, which this milestone's own tests already prove closed).
 - **`hostile-episodes-input`'s reported message is not claimed to be order-independent when the input
   contains more than one hostile element** — see Decision 3's disclosed exception.
 - This milestone builds no gating and no arbitration — `tally` consults no `Invariant`, no policy
