@@ -24,6 +24,31 @@ import { timestamp } from "../../lib/contracts/timestamp.js";
  *    excluded (this header) is not what the plan's refusal is aimed at, and is this account's
  *    own standing discipline to prefer over a silent omission.
  *
+ * WHAT THESE TWO LAYERS ACTUALLY CATCH, STATED PRECISELY, NOT MORE STRONGLY THAN THEY HOLD
+ * (L4 VERIFY's own finding on this milestone, recorded here rather than left implicit): both
+ * catch ACCIDENTAL and CONVENTIONAL construction — a plain string literal, or a value built by
+ * ordinary string operations, handed to `proposeDelta` or written directly into this file's own
+ * source. Neither stops a caller willing to write a deliberate, visible cast from `string` to
+ * the literal type: `("auto-refund" + "-ceiling") as AdaptableKnobId`, or
+ * `String.fromCharCode(...) as AdaptableKnobId`, both compile cleanly and both pass the source
+ * scan above (the scan matches the literal substring `"auto-refund-ceiling"`, not an expression
+ * that only PRODUCES that string at runtime). This is the identical class of residual
+ * `lib/invariants/gate.ts` already discloses for its own `InvariantRegistry` brand ("no brand,
+ * in any TypeScript codebase, stops [a] visible, deliberate... cast") and
+ * `lib/contracts/adaptation-decision.ts` discloses for `FrozenDecision` — no design in this
+ * language stops a deliberate, visible cast, and this file does not claim otherwise.
+ *
+ * WHY THIS RESIDUAL DOES NOT REACH THE SAFETY PROPERTY THIS MILESTONE ACTUALLY EXISTS TO PROVE:
+ * a delta smuggled past both layers this way still carries `knob: "auto-refund-ceiling"` as its
+ * real, runtime string value — `lib/invariants.gate` checks that RUNTIME string against the
+ * registry (`invariant.knob === delta.knob`), not the compile-time type the cast lied about, so
+ * `gate`/`arbitrate` still resolve `frozen` for it (verified directly by L4 VERIFY running a
+ * cast-smuggled delta through the real pipeline; see `.genesis/decisions/0006-domain.md` for the
+ * exact result). What the cast defeats is this file's own two COSMETIC guard-rails against
+ * accidentally or conventionally proposing the protected knob through this domain's sanctioned
+ * entry point — not the frozen invariant gate itself, which this file does not implement and
+ * cannot weaken.
+ *
  * `KnobValue = number` FOR BOTH KNOBS HERE, A DOMAIN FACT `lib/contracts` DELIBERATELY LEFT
  * OPEN (see `lib/contracts/behavior-delta.ts`'s own header: "`KnobValue = unknown` is the
  * honest default... domain-specific fact M6 owns"): `escalation-aggressiveness` is modeled as

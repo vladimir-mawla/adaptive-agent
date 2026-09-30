@@ -50,6 +50,43 @@ refusal both at the type level and by source scan:**
    own header comment, and was corrected here rather than the comment being weakened to satisfy
    an overly strict test — the test was wrong, not the disclosure.
 
+### Decision 1, continued — L4 VERIFY's finding: a deliberate cast defeats both layers above, but not the safety property this milestone exists to prove
+
+L4 VERIFY smuggled `"auto-refund-ceiling"` past both of Decision 1's enforcement layers with a
+visible `as` cast built from runtime string operations, e.g. `("auto-refund" + "-ceiling") as
+AdaptableKnobId` and a `String.fromCharCode(...)`-built equivalent — both compile cleanly (a cast
+from `string` to one of its own literal members is ordinary, legal TypeScript) and both pass the
+source scan (which matches the literal substring `"auto-refund-ceiling"` appearing in code, not
+an expression that only produces that string once evaluated). This was an undisclosed gap in this
+file's own "enforced two ways" framing: `lib/invariants/gate.ts`'s own header already discloses
+the identical class of residual for its `InvariantRegistry` brand ("no brand, in any TypeScript
+codebase, stops [a] visible, deliberate... cast"), and `lib/contracts/adaptation-decision.ts`
+discloses it for `FrozenDecision` — `knobs.ts` did not carry the matching disclosure for its own
+two layers. Its header now does (see `knobs.ts` itself for the exact wording).
+
+**The mitigating half, and the more important one:** L4 VERIFY then ran the cast-smuggled delta
+end-to-end through the real pipeline (`evaluateDelta`, this domain's own composition of the
+frozen `tally → gate → arbitrate` chain) rather than stopping at "the type system was defeated."
+It resolved `{"kind":"frozen","invariant":"inv-auto-refund-ceiling"}` — identical to an
+honestly-constructed attack delta. The reason: `lib/invariants.gate` compares the delta's
+*runtime* `knob` string against the registry (`invariant.knob === delta.knob`), never the
+compile-time type a cast can lie about. A cast defeats `knobs.ts`'s own two guard-rails against
+*accidentally or conventionally proposing* the protected knob through this domain's one
+sanctioned entry point — it does not, and structurally cannot, defeat the frozen invariant gate
+itself, because that gate was never implemented by `knobs.ts` in the first place; it lives in
+`lib/invariants`, reads the value actually present at runtime, and is FROZEN.
+
+**Stated at its true strength, not more broadly:** this confirms the safety property holds for
+*this one route* — a cast-smuggled `BehaviorDelta` still reaching `evaluateDelta`'s real
+`gate`/`arbitrate` call. It is not a claim that every conceivable bypass of this domain's own
+code is equally harmless, nor a re-statement of `lib/invariants/gate.ts`'s own already-disclosed
+residual (an `InvariantRegistry` value itself forged via `someMutableArray as unknown as
+InvariantRegistry<K>`, bypassing `createInvariantRegistry` entirely, which this milestone did not
+newly re-verify and does not claim to have closed). What this milestone's own layered design
+demonstrates is the intended failure mode: a cosmetic, domain-level guard-rail can be defeated by
+a deliberate cast, while the actual safety-bearing check — the frozen gate, one layer down, over
+the real runtime value — is not.
+
 ## Decision 2 — `proposeDelta` returns `BehaviorDelta<AdaptableKnobId, number>`, not `BehaviorDelta<DomainKnobId, number>`; widening happens at the call site, not inside `knobs.ts`
 
 Given Decision 1's one-directional dependency (`invariants.ts` → `knobs.ts`, never the reverse),
@@ -200,3 +237,25 @@ while missing its actual point.
   actually rules out the one cycle shape that could exist given this domain's own one-directional
   `invariants.ts` → `knobs.ts` dependency) — it is not a general graph-cycle detector over
   arbitrary future imports.
+- **Does not claim `knobs.ts`'s two enforcement layers stop a deliberate cast** — see Decision 1,
+  continued, above: they catch accidental and conventional construction only; a visible `as`
+  cast defeats both, and the safety property this milestone exists to prove rests on
+  `lib/invariants.gate`'s own runtime check one layer down, not on `knobs.ts`'s guard-rails.
+
+## Observation recorded for M9 (a disclosed fact about the current repo, not a promise about what M9 will do)
+
+`eslint.config.mjs` (genesis-time infrastructure, predating this milestone, not this milestone's
+to fix) is deliberately not TypeScript-aware — `typescript-eslint` hard-throws at require time
+against TypeScript 7.x (tracked upstream at `typescript-eslint/typescript-eslint#10940`), and this
+repo pins `typescript@7.0.2` like its siblings (`.genesis/PLAN.md` §5). The practical consequence,
+confirmed by L4 VERIFY: `eslint.config.mjs`'s own config ignores `.ts`/`.tsx` files entirely, so
+`npm run lint` passing is a real check only over plain JS/config files, not over any of this
+repo's own TypeScript source — `npm run typecheck` (`tsc`, not `eslint`) is the actual static-
+analysis backstop for everything under `lib/**`/`domains/**`/`app/**`. This is already stated,
+in passing, in `.genesis/PLAN.md` §5's own `eslint.config.mjs` bullet ("`lint` covers plain
+JS/config files only and `typecheck`... is what actually checks `.ts`/`.tsx` sources") — this
+note exists so M9's own "Honest limits" section (plan §3, M9's own scope) states it explicitly
+for a reader of that document, rather than requiring them to find the same sentence buried in
+`PLAN.md` §5 or infer from `npm run lint` printing no output that it examined this milestone's
+own source at all. Recorded here as an observation this milestone is handing forward, not a
+commitment about what M9 will contain.
