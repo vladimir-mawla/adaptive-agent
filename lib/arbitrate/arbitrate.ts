@@ -214,6 +214,25 @@ function buildFrozenDecision(deltaId: BehaviorDeltaId, invariant: InvariantId): 
  * not permitted to change (`lib/contracts/**` is FROZEN — see the PR
  * report for why this is flagged as a finding, not worked around with an
  * `as`/invented field).
+ *
+ * A SECOND CALLER-CONSISTENCY CHECK, ADDED AFTER L4 VERIFY — `tally.deltaId
+ * === delta.id` IS VERIFIED BEFORE ANYTHING ELSE RUNS: this function
+ * already refuses an inconsistent `gateResult`/`invariantRegistry` pair
+ * (below) rather than silently trusting it; the identical caller-
+ * consistency question exists for `tally` and was, until this check was
+ * added, left unverified — a caller could hand `arbitrate` one delta
+ * alongside a DIFFERENT delta's `EvidenceTally`, and this function would
+ * rule on it and cite the wrong evidence in the returned decision, silently.
+ * `lib/evidence/tally.ts` (M3, FROZEN) takes `deltaId` as an explicit
+ * parameter, separate from `episodes`, for exactly this reason — its own
+ * header names the identical failure mode ("mismatched-delta-episode... a
+ * caller accidentally handing it another delta's episodes") and refuses it
+ * with its own typed failure. `arbitrate` sits one layer downstream of that
+ * check, receiving an already-built `EvidenceTally` whose `deltaId` field
+ * it had, until now, never actually read — this closes that gap, throwing
+ * rather than fabricate or silently accept a mismatched tally, the same
+ * "refuse to lie about what a decision is based on" standard this function
+ * already applies to the `gateResult`/`invariantRegistry` pair.
  */
 export function arbitrate<KnobId extends string = string, KnobValue = unknown>(
   delta: BehaviorDelta<KnobId, KnobValue>,
@@ -222,6 +241,14 @@ export function arbitrate<KnobId extends string = string, KnobValue = unknown>(
   priorState: KnobPriorState<KnobValue>,
   invariantRegistry: InvariantRegistry<KnobId>,
 ): AdaptationDecision<KnobValue> {
+  if (tally.deltaId !== delta.id) {
+    throw new Error(
+      `arbitrate: tally.deltaId (${JSON.stringify(tally.deltaId)}) does not match delta.id (${JSON.stringify(
+        delta.id,
+      )}) — caller handed this delta another delta's evidence.`,
+    );
+  }
+
   if (gateResult === "frozen") {
     const invariant = findInvariantForKnob(invariantRegistry, delta.knob);
     if (invariant === undefined) {

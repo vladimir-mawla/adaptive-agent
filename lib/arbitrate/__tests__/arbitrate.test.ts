@@ -109,6 +109,32 @@ describe("arbitrate is a pure function of its five inputs", () => {
   });
 });
 
+describe("arbitrate: a tally for a DIFFERENT delta than the one being arbitrated is refused loudly, never silently ruled on", () => {
+  it("throws when tally.deltaId does not match delta.id, under an 'eligible' gateResult", () => {
+    const delta = makeDelta("real-delta", "escalation-aggressiveness", 0.3, 0.5);
+    const otherDeltaId = behaviorDeltaId("someone-elses-delta");
+    const mismatchedTally = makeTally(otherDeltaId, { distinctContexts: 5, helped: 5, neutral: 0, harmed: 0 });
+    expect(() => arbitrate(delta, mismatchedTally, "eligible", { kind: "vacant" }, EMPTY_REGISTRY)).toThrow(
+      /tally\.deltaId .* does not match delta\.id/,
+    );
+  });
+
+  it("throws on the SAME mismatch even when gateResult is 'frozen' — the check runs before the frozen branch even looks at the registry", () => {
+    const delta = makeDelta("real-delta", "auto-refund-ceiling", 500, 5000);
+    const otherDeltaId = behaviorDeltaId("someone-elses-delta");
+    const mismatchedTally = makeTally(otherDeltaId, { distinctContexts: 0, helped: 0, neutral: 0, harmed: 0 });
+    expect(() => arbitrate(delta, mismatchedTally, "frozen", { kind: "vacant" }, EMPTY_REGISTRY)).toThrow(
+      /tally\.deltaId .* does not match delta\.id/,
+    );
+  });
+
+  it("does NOT throw when tally.deltaId genuinely matches delta.id — the check is a real refusal, not a blanket throw", () => {
+    const delta = makeDelta("real-delta", "escalation-aggressiveness", 0.3, 0.5);
+    const matchingTally = makeTally(delta.id, { distinctContexts: 5, helped: 5, neutral: 0, harmed: 0 });
+    expect(() => arbitrate(delta, matchingTally, "eligible", { kind: "vacant" }, EMPTY_REGISTRY)).not.toThrow();
+  });
+});
+
 describe("arbitrate: an inconsistent gateResult/invariantRegistry pair is refused loudly, not papered over with a fabricated InvariantId", () => {
   it("throws if gateResult is 'frozen' but the supplied registry names no invariant on delta.knob", () => {
     const delta = makeDelta("d1", "escalation-aggressiveness", 0.3, 0.5);
