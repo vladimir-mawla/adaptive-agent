@@ -10,12 +10,21 @@ import { defineConfig } from "vitest/config";
 // vitest.config.ts document: an empty glob costs nothing today and means
 // this file never needs a second edit purely to teach vitest where a
 // later, already-planned milestone's tests live.
-//   - "lib/**/*.test.ts"      — M1 (contracts) onward
-//   - "app/**/*.test.ts"      — M2 (deploy) / M8 (UI)
-//   - "domains/**/*.test.ts"  — M6 (support-triage domain)
-//   - "tests/**/*.test.ts"    — this repo's own smoke test now; M7's failure
-//                                suite later (plan's freeze boundary is
-//                                tests/failures/**)
+//   - "lib/**/*.test.ts"          — M1 (contracts) onward
+//   - "app/**/*.test.ts"          — M2 (deploy) / M8 (UI)
+//   - "domains/**/*.test.ts"      — M6 (support-triage domain)
+//   - "tests/**/*.test.ts"        — this repo's own smoke test now; M7's
+//                                    failure suite later (plan's freeze
+//                                    boundary is tests/failures/**)
+//   - "components/**/*.test.ts(x)" — M8's own view-model and render-smoke
+//                                    tests (plan §3, M8: "Files it owns...
+//                                    components/__tests__/*.test.ts(x)").
+//                                    `.tsx` needs no plugin here — the one
+//                                    M8 test that renders JSX uses
+//                                    `react-dom/server`'s
+//                                    `renderToStaticMarkup`, which vitest's
+//                                    esbuild transform compiles like any
+//                                    other file; no jsdom is added.
 //
 // `fileParallelism: false` is deliberately NOT set here, unlike
 // agent-control-tower's own vitest.config.ts at its current tip. That
@@ -34,6 +43,8 @@ export default defineConfig({
       "app/**/*.test.ts",
       "domains/**/*.test.ts",
       "tests/**/*.test.ts",
+      "components/**/*.test.ts",
+      "components/**/*.test.tsx",
     ],
     watch: false,
   },
