@@ -62,6 +62,42 @@ the same "fail loud on 'should never happen', don't silently misreport" standard
 loudly" test constructs exactly this pair against an empty registry and confirms the throw, with
 the message, not merely that *something* threw.
 
+**A second caller-consistency boundary, added after L4 VERIFY found it missing: `tally.deltaId !==
+delta.id` is also refused, unconditionally, before either branch below runs.** The original version
+of this function checked the `gateResult`/`invariantRegistry` pair for consistency but never checked
+that the `EvidenceTally` it was handed actually belonged to the `delta` it was ruling on — a caller
+could pass one delta alongside a different delta's tally, and `arbitrate` would rule on it silently,
+citing the wrong evidence in the returned decision. Fixed the same way: throw, don't fabricate or
+silently accept. This mirrors `lib/evidence/tally.ts`'s own `mismatched-delta-episode` typed failure
+(M3, FROZEN) one layer downstream — `tally()` already takes `deltaId` as an explicit parameter
+*separate* from `episodes` specifically so this class of mismatch is detectable at its own layer;
+`arbitrate` had, until this fix, never actually read the `deltaId` field on the `EvidenceTally` it
+was given, leaving the identical class of error unchecked one layer up. Proven in
+`__tests__/arbitrate.test.ts`: a mismatched tally is refused under both an `"eligible"` and a
+`"frozen"` `gateResult` (the check runs first, before either branch), and a genuinely matching tally
+is confirmed NOT to throw (so the check is a real, narrow refusal, not a blanket one). Falsified for
+real: the check was removed, the full suite re-run, and exactly 2 of the 3 new tests failed (the
+third, asserting the ABSENCE of a throw on a matching tally, correctly stayed green, since removing
+the check cannot itself introduce a throw); restored byte-for-byte, suite back to green.
+
+**A disclosed coupling risk in how the fifth parameter is used, named by L4 VERIFY and not previously
+recorded here:** `findInvariantForKnob` (`arbitrate.ts`) re-implements `gate.ts`'s own matching rule
+— `invariant.knob === delta.knob` — as its own, textually separate loop, because `gate.ts` does not
+export its internal predicate for this file to import and reuse. The two expressions are identical
+*today*, checked by direct comparison of the two files, not merely asserted to match. But they are a
+**duplicated literal, not a shared import** — `lib/invariants/**` is FROZEN for this milestone, so
+this file cannot refactor `gate.ts` to export a reusable predicate even if that were the better
+long-term shape. If a future, non-frozen edit to `gate.ts`'s own matching rule (e.g. matching on a
+normalized/case-insensitive knob string, or on more than one field) ever changes without a
+corresponding, deliberate update to `findInvariantForKnob`, the two would silently drift apart: `gate`
+could report `"frozen"` for a reason `arbitrate`'s own lookup no longer recognizes as a match, hitting
+the "inconsistent gateResult/invariantRegistry pair" throw above for a delta that a human would
+consider legitimately frozen. This is a real coupling risk this milestone introduces and does not
+close — recorded here rather than left for a future milestone to rediscover as a mysterious
+regression. The one available mitigation without touching frozen code — exporting `gate.ts`'s own
+predicate as a named helper `arbitrate` could import instead of re-deriving — is out of this
+milestone's authority to make, since it would require editing `lib/invariants/**`.
+
 ## Decision 2 — the adopt/revert asymmetry: two independent knobs (distinct-context floor, majority direction), proven to actually change the output at identical input shapes
 
 Plan §1/§3 name the asymmetry as deliberate: reverting a change that is hurting should be easier
@@ -224,6 +260,24 @@ source scan alone cannot prove the call's *result* is honoured (a call whose res
 would also pass a presence-only scan); the mock-based test alone cannot prove the call was not
 quietly deleted from a future edit that still happens to pass every behavioral test today.
 
+**A third proof, added after L4 VERIFY exercised it directly: the guard catches the residual its own
+doc comment names, for real, not only the mocked failure above.** `__tests__/architecture.test.ts`'s
+no-cast scan can, by construction, only ever look for the literal `as` keyword — it cannot see a
+value that arrives at a `FrozenDecision`-typed binding via `JSON.parse`, whose return type is `any`
+and therefore needs no cast syntax anywhere to satisfy the type checker. L4 VERIFY defeated the scan
+this exact way, building a `frozen`-shaped object carrying a populated `tally` field and assigning it
+through `JSON.parse(JSON.stringify(...))` — and reported that the REAL, non-mocked
+`assertFrozenCitesNoEvidence` still caught it and reported the contamination. Reproduced here
+independently rather than merely taken on report:
+`__tests__/integrity.test.ts`'s second `describe` block builds exactly this value and calls the
+actual, frozen `assertFrozenCitesNoEvidence` (no mock) directly, confirming `integrity.ok === false`
+with `error.field === "tally"`. This is not a gap in this milestone's own proof — it is the layered
+design (M1's type-level fix for seven reported routes, plus a runtime guard for the residual the type
+system cannot close) working exactly as `0001-contracts.md` intended: the no-cast scan proves this
+milestone's OWN code never needs the residual route, and the runtime guard is what stands between
+`arbitrate` and a value that reaches it through that residual anyway (e.g. deserialized from a log,
+a queue, or another process) — evidence the design holds, not a defect found in it.
+
 ## Decision 8 — the interaction between the distinct-context gate and a raw-count majority check, disclosed, not silently left for a reader to find
 
 `EvidenceTally` (M1, FROZEN) carries `helped`/`neutral`/`harmed` as plain per-EPISODE counts, not
@@ -269,6 +323,20 @@ be, checked by this function against the frozen `EvidenceTally` shape alone.
    of 266 tests failed — the no-cast scan in `architecture.test.ts`, by name and line number.
    Restored byte-for-byte; suite returned to 266/266; `npm run typecheck` stayed clean throughout
    (the cast itself compiles fine, by design — it is the source scan, not `tsc`, that catches it).
+4. **The `tally.deltaId === delta.id` check (added after L4 VERIFY, Decision 1) removed** (minimal,
+   uncompensated): exactly 2 of the 3 tests added for it failed — the "throws under 'eligible'" and
+   "throws under 'frozen'" cases; the third ("does NOT throw when matching") correctly stayed green,
+   since removing a check cannot itself introduce a throw it never asserts against. Restored
+   byte-for-byte; suite returned to green.
+
+Experiments 1–3 above were run, and their exact pass/fail counts and failing-test names recorded,
+*before* the two post-review fixes this ADR's later edits describe (the `tally.deltaId` check and
+this Decision 6 correction) were added — the suite has since grown from 266 to 269 tests (three new
+`tally.deltaId` cases) plus one further test proving the JSON.parse residual directly (Decision 7),
+for a current total the "Verify" section of this milestone's PR report states freshly rather than
+reusing these historical numbers. The **266** figure in experiments 1–3 above is preserved exactly as
+it was measured at the time, not retrofitted to the current total, because retrofitting a past
+measurement to a later suite size would misrepresent what was actually observed at each step.
 
 ## What this milestone does not claim
 
@@ -283,6 +351,10 @@ be, checked by this function against the frozen `EvidenceTally` shape alone.
   others' (Decision 8)** — a real, disclosed gap distinct from, though adjacent to, plan §4's own
   failure case 6, and not closeable from `arbitrate`'s own signature without a richer
   `EvidenceTally` shape that `lib/evidence` (FROZEN) does not provide.
+- **`findInvariantForKnob`'s matching predicate is a duplicated literal, not a shared import, from
+  `gate.ts`'s own internal one (Decision 1)** — correct today, checked directly, but a coupling risk
+  that a future (non-frozen) change to `gate.ts`'s own matching rule could silently drift away from
+  without either file's own tests catching it, since neither imports the other's predicate.
 - **This milestone builds no domain and no UI.** `arbitrate` consults no ticket, customer, or
   render logic — it is a pure ruling over five already-computed inputs, matching plan §3's own M5
   scope line. Whether a concrete domain (M6, unbuilt) correctly computes and threads
