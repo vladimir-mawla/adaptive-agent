@@ -157,20 +157,57 @@ only as: (a) which of `arbitrate`'s own source branches produced the `hold` (rea
 or a richer wrapper return type built at that point, against a real, named consumer — not
 speculatively here.
 
-## Decision 6 — construction sites need no cast, proven by source scan, not merely by the absence of a compile error
+## Decision 6 — construction sites need no cast, proven by source scan, not merely by the absence of a compile error — CORRECTED, A PRIOR DRAFT OF THIS DECISION OVERCLAIMED
 
-This milestone's own brief names M1's actual incident (excess-property checking bypassed by
-assembling a candidate through an intermediate `const`) and asks that `arbitrate`'s own
-construction sites not reach for `as` to route around the equivalent problem. Every `AdaptationDecision`
-literal `arbitrate` returns — `adopt`, `hold`, `revert`, and the `frozen` literal built in
-`buildFrozenDecision` — is a fresh object literal assigned directly at a `return` site, typed by
-inference against the function's own declared return type; none needs a cast, because none is
-built through an intermediate binding, a spread, or a generic helper (the exact non-literal shapes
-M1's own incident exploited). `__tests__/architecture.test.ts` proves this by SOURCE SCAN (a
+**The overclaim, found by L4 VERIFY, stated plainly rather than restated more gently:** an earlier
+draft of this Decision said "none [of `arbitrate`'s returned literals] is built through an
+intermediate binding, a spread, or a generic helper." That is false as written:
+`buildFrozenDecision` does exactly this —
+
+```ts
+const decision: FrozenDecision = { kind: "frozen", deltaId, invariant };
+const integrity = assertFrozenCitesNoEvidence(decision);
+...
+return decision;
+```
+
+`const decision: FrozenDecision = { ... }` *is* an intermediate binding — the object literal is
+not constructed directly at the `return` site, it is assigned to a named variable first (so that
+`assertFrozenCitesNoEvidence` has something to inspect before the function returns), and that
+variable is what `return` actually hands back. Recorded here at the correct strength rather than
+restated a second time still too strongly, per this account's own standing note that a disclosed
+limit stated *more* strongly than it holds is its own defect, not a smaller version of the same
+mistake as understating one.
+
+**Why this binding is still safe — the mechanism, not a blanket claim about "no bindings":** M1's
+actual incident (`0001-contracts.md` Decision 1) was that TypeScript's *excess-property check*
+applies only to a fresh object literal written directly at an assignment/argument/array-element
+site — an intermediate binding lets a stray evidence-shaped field slip through *that specific
+check* undetected. M1's fix was not "forbid intermediate bindings" — no such rule would be
+enforceable or is even asked for — it was to declare `tally`/`distinctContextsNeeded`/`revertedTo`
+as `tally?: never` on `FrozenDecision`, which moves the check from excess-property-checking
+(literal-site-only) to *ordinary assignability*, checked at **every** site a value is given that
+type, binding or not. `const decision: FrozenDecision = { kind: "frozen", deltaId, invariant }` is
+still a *fresh object literal*, at its OWN declaration site, checked against an explicit
+`FrozenDecision` annotation — assignability is enforced right there, the moment the binding is
+created, not deferred past it. A stray `tally`/`distinctContextsNeeded`/`revertedTo` field on this
+literal would fail to compile at this exact line (an `@ts-expect-error`-style proof of this would
+be redundant with M1's own tests, which already prove `FrozenDecision` itself refuses these fields
+at every site — this file does not re-prove a claim `lib/contracts` already owns). What actually
+stays true, restated once at the strength that survives: every `AdaptationDecision` value
+`arbitrate` returns — `adopt`, `hold`, `revert`, and `frozen` (via the one intermediate binding in
+`buildFrozenDecision`) — is a **fresh object literal assigned at its own declaration or return
+site**, never a reused variable of a looser type, never built via a spread, and never built via a
+generic helper (the actual non-literal shapes M1's own incident exploited, per `0001-contracts.md`'s
+seven reported routes) — not "never through any binding at all," which was the false, broader claim.
+
+`__tests__/architecture.test.ts` proves the resulting "no cast is needed" claim by SOURCE SCAN (a
 compile-time absence of errors would not distinguish "no cast was needed" from "a cast was written
 and happened to compile," since a cast always compiles by design) — confirmed to actually fire by
 temporarily inserting a real `as unknown as` cast and re-running the scan (see this milestone's PR
-report for the falsifiability log).
+report for the falsifiability log). That proof is unaffected by this correction: the scan checks
+for `as`, not for the absence of intermediate bindings, and `buildFrozenDecision`'s own binding
+never needed one.
 
 ## Decision 7 — `assertFrozenCitesNoEvidence` is called, and is load-bearing, proven two ways
 
