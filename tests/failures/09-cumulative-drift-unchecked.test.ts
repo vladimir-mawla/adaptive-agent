@@ -9,7 +9,22 @@ import { distinctContextEpisodes, VACANT } from "./helpers.js";
  * CHECKED (`.genesis/PLAN.md` §4, case 8 — "the riskiest disclosed gap in
  * this plan")
  * ============================================================
- * KIND: DISCLOSES THE RISKIEST UNSOLVED GAP IN THIS PROJECT'S OWN PLAN.
+ * KIND: DISCLOSES THE RISKIEST UNSOLVED GAP IN THIS PROJECT'S OWN PLAN —
+ * ONE MANIFESTATION OF IT, NOT THE WHOLE OF IT. SEE CASE 17 FOR THE
+ * DEEPER, SIMPLER ROOT CAUSE THIS CASE DOES NOT, BY ITSELF, MAKE PLAIN.
+ *
+ * A FRAMING CORRECTION, MADE AFTER L4 VERIFY: this case's own original
+ * framing — several small, individually-corroborated deltas accumulating
+ * across a SEQUENCE — could leave a reader believing the underlying risk
+ * requires an attacker's patience, walking a knob gradually over several
+ * rounds. IT DOES NOT. `tests/failures/17-no-value-range-check-at-all.
+ * test.ts` demonstrates the simpler root cause directly: there is no
+ * value-range check on a knob AT ALL, not even on a single delta's first
+ * and only proposal — a lone delta proposing `escalation-aggressiveness`
+ * jump straight from 0.5 to 999,999 adopts immediately, no sequence, no
+ * drift, and no prior adoption required. Read this case as ONE way that
+ * deeper gap shows up (several small, plausible-looking steps compounding
+ * unnoticed), not as the requirement for the gap to matter at all.
  *
  * THE GAP, STATED PLAINLY: `arbitrate` (M5, FROZEN) rules on exactly one
  * candidate delta's own tally against the CURRENT gate result and the
@@ -21,16 +36,17 @@ import { distinctContextEpisodes, VACANT } from "./helpers.js";
  * own logic inspects how far a knob's live value has already walked from
  * any original baseline."
  *
- * THE CONCRETE CONSEQUENCE, DEMONSTRATED HERE, NOT MERELY ASSERTED: three
- * SEPARATE, each individually well-corroborated (3 distinct helped
+ * THE CONCRETE CONSEQUENCE THIS CASE DEMONSTRATES, NOT MERELY ASSERTED:
+ * three SEPARATE, each individually well-corroborated (3 distinct helped
  * contexts apiece — comfortably clearing MIN_DISTINCT_CONTEXTS_ADOPT every
  * single time) deltas, each superseding the previous live value on
  * `escalation-aggressiveness`, walk the knob from its documented [0, 1]
  * range all the way to 3.4 — a value `domains/support-triage/knobs.ts`'s
  * own header describes as a bounded float in [0, 1] and which no runtime
  * check anywhere in this codebase rejects. Nothing about any INDIVIDUAL
- * step is unusual or under-evidenced; the sequence as a whole is what is
- * unchecked.
+ * step is unusual or under-evidenced; this case's own point is that the
+ * SEQUENCE as a whole is unchecked — while case 17's point is that no
+ * single step is checked EITHER, sequence or not.
  *
  * WHY THIS IS NOT THIS MILESTONE'S TO FIX: `.genesis/PLAN.md` §4 case 8
  * itself states "building real cumulative-bound tracking is a materially
