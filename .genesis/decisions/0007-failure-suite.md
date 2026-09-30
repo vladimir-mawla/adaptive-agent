@@ -121,25 +121,25 @@ actual shipped code (not copied from the ADR's own prose) before being turned in
 | `contextId` spelling drift | `node -e` against all four mechanisms directly (see helpers.ts's own header) | `06-context-id-spelling-drift.test.ts` |
 | `hold.distinctContextsNeeded === 0` | Read `arbitrate.ts`'s own `distinctContextsShortfall` and both call sites that produce `hold` | `12-hold-distinctContextsNeeded-is-zero.test.ts` |
 | Raw-count majority dominated by volume | Read `EvidenceTally`'s own shape (M1, FROZEN) and `helpedMajority`'s raw-count definition | `11-raw-count-majority-dominated-by-volume.test.ts` |
-| Duplicated `invariant.knob === delta.knob` predicate | Read both `gate.ts`'s internal loop and `arbitrate.ts`'s `findInvariantForKnob` side by side, confirmed textually separate, not imported | Not independently pinned as its own test — see "What this milestone does not claim" below |
+| Duplicated `invariant.knob === delta.knob` predicate | Read both `gate.ts`'s internal loop and `arbitrate.ts`'s `findInvariantForKnob` side by side, confirmed textually separate, not imported; pinned (not falsified) per Round 2 below | `16-predicate-consistency-pin.test.ts` |
 | Cast residuals (`AdaptableKnobId`, `InvariantRegistry`) | Reproduced both casts directly against the real, shipped source | `13-cast-residuals-bypass-type-brands.test.ts` |
 | `Object.freeze` one level deep | Confirmed `Invariant`'s three fields are all primitives today, then simulated the disclosed future case via a cast | `14-freeze-is-one-level-deep.test.ts` |
 | No cumulative-drift tracking | Walked a real three-step adoption sequence through `evaluateDelta` | `09-cumulative-drift-unchecked.test.ts` |
 | `eslint.config.mjs` ignores `.ts`/`.tsx` | Read the config file directly, then ran a real, deliberately broken `.ts` fixture through both `npm run lint` and `npm run typecheck` | `15-eslint-config-ignores-typescript.test.ts` |
 
-**The duplicated-predicate coupling risk is the one item in this list NOT given its own dedicated
-case**, disclosed here rather than silently dropped: `lib/arbitrate/arbitrate.ts`'s own
+**The duplicated-predicate coupling risk is pinned, not falsified — see Round 2 below for why that
+distinction matters and how the pin was built**: `lib/arbitrate/arbitrate.ts`'s own
 `findInvariantForKnob` re-implements `gate.ts`'s internal `invariant.knob === delta.knob` predicate
 as a textually separate loop (`.genesis/decisions/0005-arbitration.md` Decision 1 already names
-this). The two are identical TODAY, but nothing currently forces them to drift apart from within
-this milestone's own scope — reproducing that drift would require editing `gate.ts` itself (FROZEN)
-to introduce a different matching rule, which is out of this milestone's authority. What IS proven,
-already, by `lib/arbitrate/__tests__/arbitrate.test.ts`'s own "an inconsistent gateResult/
-invariantRegistry pair is refused loudly" test: the one place this kind of drift would actually
-surface (a `gateResult` that no longer matches what the registry itself says) fails loud rather than
-silently misreporting. This milestone does not re-prove that existing test; it defers to it rather
-than duplicating it, and names the coupling risk here so a reader finds it in one place rather than
-two ADRs.
+this). The two are identical TODAY, and `16-predicate-consistency-pin.test.ts` now asserts exactly
+that, structurally, from both files' own source — but nothing currently forces them to stay
+identical from within this milestone's own scope, and reproducing an actual drift between them
+would require editing `gate.ts` itself (FROZEN) to introduce a different matching rule, which is out
+of this milestone's authority. What IS proven, already, by `lib/arbitrate/__tests__/
+arbitrate.test.ts`'s own "an inconsistent gateResult/invariantRegistry pair is refused loudly" test:
+the one place an actual drift would surface (a `gateResult` that no longer matches what the registry
+itself says) fails loud rather than silently misreporting. This milestone does not re-prove that
+existing test; it defers to it rather than duplicating it.
 
 ## Falsifiability — which cases were proven by making them fail, for real, and restored byte-for-byte
 
@@ -173,24 +173,77 @@ After each experiment, `diff` against a pre-sabotage backup confirmed a byte-for
 `git status --short`/`git diff main -- lib domains app` were confirmed empty before any commit in
 this milestone — no FROZEN file was ever committed in a broken state at any point.
 
+## Round 2 — L4 VERIFY findings, each fixed for real, not merely acknowledged
+
+L4 VERIFY approved this milestone's overall shape (no case judged padding, all three Round-1
+sabotage experiments reproduced exactly, both sketch refinements upheld) and found three concrete
+issues. All three are fixed in this branch's own history below, not deferred to a future milestone.
+
+**1. Case 15's typecheck claim was false — caught, reproduced, and fixed.** The original scratch
+fixture lived under a dot-prefixed directory (`tests/failures/.scratch-case-15/`). `tsc`'s own
+directory-crawling behavior for an `include` glob (`tsconfig.lib.json`'s `"tests/**/*.ts"`) silently
+SKIPS any dot-prefixed directory — confirmed directly, twice: generically (a fresh dot-directory
+with an undeclared-identifier fixture, `tsc` exits 0) and against the exact original scratch path.
+`npm run typecheck` genuinely never saw the broken file, so "rejected by `npm run typecheck`" was
+never true as originally written, and was shipped without ever being checked against a real `tsc`
+run. **The fix:** the fixture now lives under a non-dot-prefixed scratch directory
+(`tests/failures/scratch-case-15/`), confirmed directly to make `tsc` report `TS2304` naming the
+undeclared identifier and exit non-zero. The dot-directory skip is kept as its own, separate,
+disclosed gotcha (a dedicated test in the same file), since a reader relying on a hidden scratch
+directory to keep `tsc`'s own crawl out would be fooled the identical way this milestone briefly
+was.
+
+**2. The predicate-drift deferral was incompletely reasoned — a pinning test was available without
+touching frozen code, and this ADR previously did not engage with that option.** `tests/failures/
+16-predicate-consistency-pin.test.ts` is that pin: it asserts, by reading `gate.ts`'s and
+`arbitrate.ts`'s own source directly, that (a) `gate.ts`'s predicate compares `invariant.knob`
+against `delta.knob`; (b) `arbitrate.ts`'s `findInvariantForKnob` predicate compares `invariant.knob`
+against its own parameter; (c) that parameter is bound, at arbitrate's one call site, to `delta.knob`
+— together proving the two predicates reduce to the identical comparison TODAY, without editing
+either FROZEN file. **Falsified for real, twice, against the real shipped source:** `gate.ts`'s
+predicate was temporarily changed to `invariant.knob.toLowerCase() === delta.knob` and the pin's
+first assertion failed exactly as predicted; separately, `arbitrate.ts`'s call site was temporarily
+changed to pass `delta.knob as KnobId` and the pin's third assertion failed exactly as predicted.
+Both were restored byte-for-byte before any commit. This turns "we could not falsify the drift" into
+"we could, separately, pin that no drift has happened yet" — the distinction L4 VERIFY's brief named
+directly.
+
+**3. A real limit none of the original 15 cases pinned, and the strongest finding in the round-2
+review: there is no value-range check on a knob's own value AT ALL, not only across a sequence.**
+L4 VERIFY ran `proposeDelta({ knob: "escalation-aggressiveness", from: 0.5, to: 999999 })` plus 3
+genuine distinct helped-context episodes through the real pipeline and got `adopt`, immediately,
+first try — no drift, no history, no sequence of any kind required. Case 9 (cumulative drift) had
+framed the unchecked-bound gap as requiring an accumulated SEQUENCE of small, individually-
+corroborated steps; that framing, read on its own, undersells the root cause and could leave a
+reader believing patience is required. It is not. **The fix:** `tests/failures/
+17-no-value-range-check-at-all.test.ts` pins the single-step root cause directly (on both adaptable
+knobs, both an absurdly large and a negative out-of-range value), and case 9's own header is revised
+to point at case 17 as the deeper, simpler cause it is one manifestation of, rather than standing
+alone as if sequence were the requirement.
+
 ## What this milestone does not claim
 
 - **This milestone does not claim to have found every limit in this system** — only the ones named
   in its own brief, the ten from the plan's own sketch (refined where the literal wording would have
-  produced a regression test), and two found by independently re-deriving and testing prose an
-  existing ADR/source header already disclosed but never turned into a running proof.
-- **The duplicated-predicate coupling risk (`0005-arbitration.md` Decision 1) is disclosed, not
-  independently falsified** — reproducing the drift it warns about would require editing FROZEN
-  `lib/invariants/gate.ts`, out of this milestone's authority. What this milestone confirms instead
-  is that the one place such drift would surface (an inconsistent `gateResult`/registry pair) is
-  already covered by `lib/arbitrate`'s own existing test.
+  produced a regression test), two found by independently re-deriving and testing prose an existing
+  ADR/source header already disclosed but never turned into a running proof, and one (case 17) found
+  by L4 VERIFY during its own independent review of this branch.
+- **The duplicated-predicate coupling risk (`0005-arbitration.md` Decision 1) is now pinned (Round
+  2, item 2), but still not independently FALSIFIED** — reproducing an actual drift between the two
+  predicates would require editing FROZEN `lib/invariants/gate.ts` to introduce a different matching
+  rule, out of this milestone's authority. What this milestone confirms instead: the pin is real
+  (falsified twice against the real source and restored, see Round 2), and the one place an actual
+  drift would surface at runtime (an inconsistent `gateResult`/registry pair) is already covered by
+  `lib/arbitrate`'s own existing test.
 - **Case 6 (spelling drift) and case 7 (reporter identity) are each disclosed, not solved** — no
   code change accompanies either; `lib/evidence`/`lib/contracts` remain exactly as FROZEN as they
   were before this milestone, per this milestone's own scope (pin limits, do not fix them).
-- **Case 9 (cumulative drift) does not attempt to bound or track drift** — it demonstrates the gap
-  is reachable through the real pipeline, matching the plan's own statement that building real
-  cumulative-bound tracking is out of this project's M3–M5 budget, and therefore out of M7's
-  authority to retrofit.
+- **Case 9 (cumulative drift) and case 17 (no value-range check at all) do not attempt to bound or
+  validate a knob's value** — both demonstrate the gap is reachable through the real pipeline,
+  matching the plan's own statement that building real cumulative-bound tracking is out of this
+  project's M3–M5 budget, and therefore out of M7's authority to retrofit; case 17 does not attempt
+  even the narrower, single-value bound check its own existence might otherwise suggest is easy to
+  add.
 - **This milestone adds no code under `lib/**`/`domains/**`/`app/**`** — confirmed directly,
   `git diff main -- lib domains app` is empty throughout this milestone's own history, not merely
   at the final commit.
