@@ -110,7 +110,7 @@ beforeEach(() => {
 
 describe("auto-refund-ceiling: its episodes are passed to evaluateDelta, and arbitrate is handed a tally of them, yet rules frozen", () => {
   for (const count of [3, 500, 10_000]) {
-    it(`${count} distinct helped episodes: evaluateDelta is called with a list growing 0..${count}, ending in exactly those ${count} episodes in order, and arbitrate receives a ${count}-distinct / ${count}-helped tally with gateResult "frozen" every time`, () => {
+    it(`${count} distinct helped episodes: evaluateDelta is called with a list growing 0..${count}, ending in exactly those ${count} episodes in order, and arbitrate receives a ${count}-distinct / ${count}-helped tally on its last call, and gateResult "frozen" and a frozen decision on every call`, () => {
       const inputs = Array.from({ length: count }, (_, i) => helped(`tck-${i}`));
       const view = computeKnobView("auto-refund-ceiling", inputs);
 
@@ -127,9 +127,9 @@ describe("auto-refund-ceiling: its episodes are passed to evaluateDelta, and arb
       expect(lastEpisodes.every((e) => String(e.deltaId) === PROTECTED_ID && e.outcome === "helped")).toBe(true);
       expect(lastEpisodes.map((e) => String(e.contextId))).toEqual(inputs.map((input) => input.contextId));
 
-      // arbitrate: handed a tally that counts all of them, with a frozen gate verdict, on every call
-      // — and it returns frozen on every call, so the tally was present at arbitrate and the
-      // ruling was frozen at every list size from 0 to N.
+      // arbitrate: on its last call it is handed a tally that counts all of them; on every call
+      // gateResult is "frozen" and the decision is frozen — so the tally was present at arbitrate and
+      // the ruling was frozen at every list size from 0 to N.
       const arbitrateCalls = arbitrateCallsFor(PROTECTED_ID);
       expect(arbitrateCalls).toHaveLength(count + 1);
       expect(arbitrateCalls.every((c) => c.gateResult === "frozen" && c.decisionKind === "frozen")).toBe(true);
