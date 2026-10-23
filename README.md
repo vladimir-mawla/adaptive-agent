@@ -164,8 +164,8 @@ pattern". The reason is that `typescript-eslint` does not support TypeScript 7: 
 version peerDependencies` on 2026-10-23 printed `8.72.0` and `typescript: '>=4.8.4 <6.1.0'`, against this
 repository's `typescript@7.0.2`. `npm run typecheck` is the backstop, but it is a compiler, not a linter.
 Pinned by `tests/failures/15-eslint-config-ignores-typescript.test.ts`. A related coupling: that file shells out
-to `npm run typecheck` and `npx eslint` and writes a deliberately broken `.ts` fixture under
-`tests/failures/` while it runs, so a type error anywhere also fails `npm test` (observed: weakening one
+to `npm run typecheck` and `npx eslint` and writes two deliberately broken `.ts` fixtures under
+`tests/failures/` (`.scratch-case-15-dotdir-repro/` and `scratch-case-15/`) while it runs and removes them afterwards (untracked entries appear in `git status` during a run; the tree is clean after), so a type error anywhere also fails `npm test` (observed: weakening one
 `frozen` field in a scratch clone failed exactly that file), and an interrupted run could leave the fixture
 behind.
 
