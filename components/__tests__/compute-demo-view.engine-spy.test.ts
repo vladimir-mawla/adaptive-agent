@@ -17,12 +17,13 @@ import { DEMO_DELTAS, computeKnobView, type RawEpisodeInput } from "../compute-d
  *
  * WHAT IS SPIED, AND NOTHING BEYOND IT. Two wrappers, each calling straight through to the real
  * implementation (the real functions still run; nothing is stubbed):
- *   1. `evaluateDelta` (`domains/support-triage/scenario.ts`) — records the delta id, the episode
- *      list it was called with (copied at call time, so later in-place pushes cannot alter the
- *      record) and the `priorState` kind.
- *   2. `arbitrate` (`lib/arbitrate/arbitrate.ts`) — records the `EvidenceTally` and `gateResult` it
- *      was called with, and the decision kind it returned. For the protected knob this is the point
- *      at which the evidence is demonstrably present AND demonstrably not what decides the ruling.
+ *   1. `evaluateDelta` (`domains/support-triage/scenario.ts`) — records, per call, the delta id, the
+ *      length of the episode list and the `priorState` kind, and keeps a copy (taken at call time, so
+ *      later in-place pushes cannot alter it) of the MOST RECENT episode list per delta id.
+ *   2. `arbitrate` (`lib/arbitrate/arbitrate.ts`) — records, per call, the `EvidenceTally` and
+ *      `gateResult` it was called with and the decision kind it returned. For the protected knob this
+ *      shows the evidence present at `arbitrate` as a tally, with the returned decision `frozen` at
+ *      every list size from 0 to N.
  * What is NOT spied: `tally` and `gate` are not wrapped, so the hand-off from `evaluateDelta` to them
  * is established only by `arbitrate` receiving a tally whose counts equal the episodes' — not
  * observed directly.
