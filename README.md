@@ -195,7 +195,9 @@ still reports four vulnerable packages (2 high: `source-map-js`, `vite`; 2 moder
 and `npm audit --omit=dev` reports one, the high `source-map-js`, which comes in under `next`'s `postcss`.
 Nothing in this repository has assessed it.
 
-### Limits nobody had written down before this document
+### Further limits
+
+These are gathered here. Items 12, 13, 17 and 18 were already recorded elsewhere (`lib/arbitrate/policy-constants.ts`, ADR 0008 Decision 6, PR #17's description and ADR 0002 respectively), as each item says.
 
 **11. Nothing consumes the decisions, and the page keeps no state.** See "What it is not". The deployed page
 holds its history in `useState`; there is no storage or network call in `app/` or `components/` (grep for
