@@ -6,7 +6,7 @@ stage, what does the engine refuse to do, and why.** Every refusal below is cite
 title, quoted from the source, except where its bullet says otherwise. `npm test` on `main` at `2879c13` prints `Test Files  44 passed (44)` and
 `Tests  384 passed (384)`. Anything that could not be traced to a test or to a command run for this
 document is either marked as a reading of the source, or cut. The scratch experiments named below were run on
-a clone of `44e42b4`; `2879c13` differs from it only in `package.json` and `package-lock.json`
+a clone of `44e42b4`, except the two that name the M3 and M4 merge commits (`8ccf08b`, `2ce7b8c`); `2879c13` differs from it only in `package.json` and `package-lock.json`
 (`git diff --stat 44e42b4 2879c13`).
 
 **Two kinds of citation.** A title beginning `TYPE-LEVEL` is marked **[tsc]**. Its body is an
