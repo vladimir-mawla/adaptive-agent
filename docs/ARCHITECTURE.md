@@ -122,7 +122,7 @@ a bare `EvidenceTally` has nowhere to put a failure, and a zero-episode delta ha
   `lib/evidence/__tests__/order-independence.test.ts` — "every one of the 5! = 120 orderings of a
   5-episode, 3-context scenario (including a repeated context) produces the identical EvidenceTally", "50
   identical-context episodes plus 2 genuinely distinct ones — every ordering still reports distinctContexts:
-  3", and 150 seeded property scenarios (titles beginning `scenario seed=0` … `scenario seed=149`). Its generator
+  3" (its body checks 200 seeded shuffles, not every one of the 52! orderings), and 150 seeded property scenarios (titles beginning `scenario seed=0` … `scenario seed=149`). Its generator
   draws `contextId` from a pool of three, so collisions happen; the test that checks this is "CONFIRMS THE
   GENERATOR CAN ACTUALLY PRODUCE THE CASE THAT MATTERS…".
 - **Refuses to crash on a hostile array.** A `Proxy` or a throwing getter becomes a typed
