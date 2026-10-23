@@ -179,6 +179,22 @@ by `handleInject` with the literal `"helped"` left all 384 tests passing and `ty
 walkthrough was driven by hand on the live page instead (`docs/NOTES.md` records what it read back). ADR 0008
 also records that the `response-directness` "(adaptable)" label is unpinned; I did not re-run that.
 
+**10. `next` was pinned with 11 advisories; this is the state as of 2026-10-23T22:37:52Z.**
+`npm audit --json` on the `next@16.3.5` lockfile reported 11 advisories against `next`: 3 critical, 2 high, 5
+moderate, 1 low. (The summary line says `critical: 1` because `npm audit` counts packages, not advisories.) The
+three critical ones are all remote code execution: GHSA-2464-fhr4-w9xw (Image Optimization API with SVG files;
+titled "Unauthenticated"), GHSA-673q-mjm6-r5xr (`use cache` functions returning typed arrays; titled
+"Unauthenticated") and GHSA-vcvr-r3jv-pc5j (`next/og` `ImageResponse`). PR #17, merged at 22:34:19Z as
+`2879c13`, moved `package.json` on `main` to `"next": "16.4.3"`; `npm audit` on that tree at 22:36:26Z reports no
+`next` finding. `/api/health` reported commit `2879c13f3465ef2d8dd6cff502cae15b175b6852` at 22:37:52Z. That
+endpoint reports the commit Vercel recorded for the build, not the framework version: I did not fingerprint the
+Next.js version the deployment is running, and I did not assess any of the eleven advisories for exploitability
+against this app. To re-check: `git show origin/main:package.json | grep '"next"'` and
+`curl -s https://adaptive-agent-gamma.vercel.app/api/health`. **Not closed by that bump:** `npm audit` on `2879c13`
+still reports four vulnerable packages (2 high: `source-map-js`, `vite`; 2 moderate: `vitest`, `@vitest/mocker`),
+and `npm audit --omit=dev` reports one, the high `source-map-js`, which comes in under `next`'s `postcss`.
+Nothing in this repository has assessed it.
+
 ### Limits nobody had written down before this document
 
 **11. Nothing consumes the decisions, and the page keeps no state.** See "What it is not". The deployed page
