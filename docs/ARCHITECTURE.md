@@ -89,8 +89,8 @@ closed, so it is not a bypass, but "frozen from the first render" is a statement
   free text — only a domain's own narrowed instantiation does"; `invariant.test.ts` — "HONEST LIMIT: the
   unparameterized default (KnobId = string) does NOT refuse free text".
 - **Refuses to derive `distinctContexts` from the outcome counts.** It is its own stored field, because
-  the two are allowed to diverge — fifty episodes from one context is `distinctContexts: 1` beside
-  fifty counted outcomes.
+  the two are allowed to diverge — 200 `helped` episodes from one context is `distinctContexts: 1` beside
+  `helped: 200` (the cited test builds that literal; Stage 2 shows `tally` producing the divergence).
   *Test:* `lib/contracts/__tests__/evidence-tally.test.ts` — "constructs a tally where distinctContexts
   diverges from the sum of the three outcome counts".
 - **Disclosed, not refused: ids have no grammar.** `contextId(raw)` in `lib/contracts/ids.ts` is `raw as
