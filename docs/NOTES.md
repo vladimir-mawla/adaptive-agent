@@ -154,7 +154,7 @@ the phrase "L4 VERIFY" per ADR, which counts the phrase and not rounds: 0001: 9,
   directly. The commit email on those five, and on the 14 commits of PR #1, is `vladimir.mawla@aspiresoftware.com`; on the
   squash commits it is `105279249+vladimir-mawla@users.noreply.github.com`.
 - The `author` field `gh pr list` reports is `vladimir-mawla` for all 17 PRs: the account that opened each one.
-- **Trailers.** `git log --remotes --format=%B | grep -i '^co-authored-by' | sort | uniq -c` printed 172 of
+- **Trailers.** Over `main` and the heads of PRs #1 to #17 (`git fetch origin '+refs/pull/N/head:refs/prs/N'` for N = 1 to 17, then `git log origin/main origin/m3-evidence origin/mark-m2-done --glob='refs/prs/*' --format=%B | grep -i '^co-authored-by' | sort | uniq -c`; a plain `git log --remotes` in a fresh clone prints smaller numbers because the merged PR branches are deleted) the count was 172 of
   `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`, 31 of `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`, 16 of
   `Co-authored-by: vladimir-mawla <vladimir.mawla@aspiresoftware.com>`, 14 of `Co-authored-by: Claude Opus 5 <noreply@anthropic.com>`,
   and one each of `Co-authored-by: Claude Sonnet 5.5`, `Co-authored-by: Claude Opus 5.5` and `Co-Authored-By: Claude Sonnet 5.5`
