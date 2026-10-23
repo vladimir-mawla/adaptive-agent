@@ -327,7 +327,7 @@ forbade the change and no evidence at all.
 
 - **Refuses to let a `frozen` decision carry `tally`, `distinctContextsNeeded` or `revertedTo`** — by fresh
   literal or by any of six non-literal routes. The fix declares all three as `?: never`, which moves the check
-  from excess-property checking (literal sites only) to assignability (everywhere). **[tsc]** *Tests:*
+  from excess-property checking (literal sites only) to assignability against the value's static type, which holds at every site where that type still has the field (a value whose static type has dropped it is not caught; README, Limits item 5). **[tsc]** *Tests:*
   `lib/contracts/__tests__/adaptation-decision.test.ts` — "TYPE-LEVEL: a fresh frozen literal carrying a tally
   does not compile", "TYPE-LEVEL route 1/6 — intermediate binding does not compile", "TYPE-LEVEL route 2/6 —
   spread does not compile", "TYPE-LEVEL route 3/6 — function return does not compile", "TYPE-LEVEL route 4/6 —
@@ -339,8 +339,8 @@ forbade the change and no evidence at all.
   `adaptation-decision.test.ts` — "TYPE-LEVEL: hold missing distinctContextsNeeded does not compile", "TYPE-LEVEL: hold with a boolean
   distinctContextsNeeded does not compile", "TYPE-LEVEL: adopt missing tally does not compile", "TYPE-LEVEL:
   revert missing tally does not compile", "TYPE-LEVEL: revert missing revertedTo does not compile".
-- **Refuses, at runtime, a `frozen` value that reached the type by a cast or an `any`.**
-  `assertFrozenCitesNoEvidence` checks presence, not provenance. *Tests:*
+- **Refuses, at runtime, a `frozen` value that reached the type by a cast, an `any`, or a supertype annotation, when `assertFrozenCitesNoEvidence` is called on it.**
+  `assertFrozenCitesNoEvidence` checks presence, not provenance. Nothing in the shipped pipeline calls it on a value received from outside: `arbitrate` calls it on its own literal and `/api/health` on a synthetic one. *Tests:*
   `adaptation-decision.test.ts` — "catches a tally that
   arrived via the disclosed cast residual", "catches a distinctContextsNeeded that arrived via the disclosed
   cast residual", "catches a revertedTo that arrived via the disclosed cast residual".
