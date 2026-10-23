@@ -340,7 +340,7 @@ forbade the change and no evidence at all.
   distinctContextsNeeded does not compile", "TYPE-LEVEL: adopt missing tally does not compile", "TYPE-LEVEL:
   revert missing tally does not compile", "TYPE-LEVEL: revert missing revertedTo does not compile".
 - **Refuses, at runtime, a `frozen` value that reached the type by a cast, an `any`, or a supertype annotation, when `assertFrozenCitesNoEvidence` is called on it.**
-  `assertFrozenCitesNoEvidence` checks presence, not provenance. Nothing in the shipped pipeline calls it on a value received from outside: `arbitrate` calls it on its own literal and `/api/health` on a synthetic one. *Tests:*
+  `assertFrozenCitesNoEvidence` checks presence, not provenance. Nothing in the shipped pipeline calls it on a value received from outside: `arbitrate` calls it on its own literal and `/api/health` on a synthetic one. The cited tests build their values with `as unknown as`; the `any` route is pinned in Stage 4 (`integrity.test.ts`, the `JSON.parse` test), and the supertype-annotation route was run in a scratch file only, with no committed test (README, Limits item 5). *Tests:*
   `adaptation-decision.test.ts` — "catches a tally that
   arrived via the disclosed cast residual", "catches a distinctContextsNeeded that arrived via the disclosed
   cast residual", "catches a revertedTo that arrived via the disclosed cast residual".
