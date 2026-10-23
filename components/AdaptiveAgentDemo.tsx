@@ -23,8 +23,8 @@ import { assertNeverAdaptationDecision } from "../lib/contracts/adaptation-decis
  * hook is `useState`, called four times): the only state this component owns is `inputsByKnob`
  * (the raw, ordered injection history per knob) and the three controlled-form fields below it.
  * Every `KnobView` is recomputed, synchronously, during this render, straight from that state —
- * see `compute-demo-view.ts`'s own header for why that is the safe choice given that `lib/**` and
- * `domains/**` contain no `async`, `await`, `Promise` or timers (grep-checked).
+ * see `compute-demo-view.ts`'s own header for why that is the safe choice given that non-test source
+ * under `lib/**` and `domains/**` contains no `async`, `await`, `Promise` or timers (grep-checked).
  */
 
 const KNOB_LABELS: { readonly [K in DomainKnobId]: string } = {

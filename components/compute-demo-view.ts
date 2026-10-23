@@ -22,11 +22,12 @@ import { evaluateDelta } from "../domains/support-triage/scenario.js";
  *
  * PURE AND SYNCHRONOUS, NO HIDDEN STATE: `computeKnobView` reads only its own arguments — no
  * clock, no randomness, and no module-level mutable state (grep-checked, outside comments: no
- * `Date`, `Math.random` or module-level `let`/`var` in this file). `__tests__/compute-demo-view.test.ts`
+ * `Date`, `Math.random` or module-level `let`/`var` in this file, and no code mutates the
+ * module-level `DEMO_*` or `VACANT_PRIOR_STATE` constants). `__tests__/compute-demo-view.test.ts`
  * pins that two calls on one input history return deep-equal views and that the history is not
  * modified. There is no `useEffect`, `useCallback`, `useMemo`, `useRef`, timer, `Promise` or
  * `async` in the code of this file or of `AdaptiveAgentDemo.tsx` (grep-checked, outside comments),
- * and `lib/**` and `domains/**` contain no `async`, `await`, `Promise` or timers (grep-checked), so deriving the whole view fresh
+ * and non-test source under `lib/**` and `domains/**` contains no `async`, `await`, `Promise` or timers (grep-checked), so deriving the whole view fresh
  * from `(knobId, episodeLog)` on every render leaves no stored derived value for a re-render to
  * leave stale (see `.genesis/decisions/0008-demo.md`, Decision 1, for the stale-derived-state
  * failure this avoids).
@@ -164,7 +165,8 @@ export interface KnobView {
  * Replays `inputs` (the full, ordered history of what a person injected against this knob) and
  * derives this knob's current `KnobView` from scratch. Called fresh on every render with
  * whatever `inputs` the component's own state currently holds — no incremental/cached phase is
- * kept in this file (no module-level mutable state, grep-checked), so no derived value is stored
+ * kept in this file (no module-level `let`/`var`, and no code mutates the module-level `DEMO_*` or
+ * `VACANT_PRIOR_STATE` constants; grep-checked), so no derived value is stored
  * for `inputs` to leave stale.
  *
  * Throws only if `evaluateDelta` refuses (see `mustEvaluate`) or `arbitrate` itself throws —
@@ -202,9 +204,9 @@ function mustEvaluate(
  * decision from that point forward, until the next post-adoption episode arrives — re-evaluating
  * afterward against an as-yet-empty `monitoring` pool under `live` would silently replace a real,
  * evidence-bearing `adopt` with a hollow one (zero tally) that happens to share the same `kind`.
- * `scripts/demo-triage.ts` avoids this same trap by construction — it prints a fresh decision
- * after every individual episode is added, never a single decision recomputed once at the end —
- * and this function follows the identical discipline.
+ * `scripts/demo-triage.ts` avoids this same trap by construction — it, in its phase-flipping
+ * escalation scenario (steps 2–6), prints a decision after each episode — and this function
+ * follows the identical discipline.
  */
 export function computeKnobView(knobId: DomainKnobId, inputs: readonly RawEpisodeInput[]): KnobView {
   const delta = DEMO_DELTAS[knobId];
