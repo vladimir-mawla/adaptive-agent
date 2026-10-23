@@ -3,7 +3,7 @@
 This is a snapshot, not a file tour — each package documents itself in its own header comments, and
 repeating that here would be a worse copy. What this document is for is the other half: **at each
 stage, what does the engine refuse to do, and why.** Every refusal below is cited to a test by file and
-title, quoted from the source. `npm test` on `main` at `2879c13` prints `Test Files  44 passed (44)` and
+title, quoted from the source, except where its bullet says otherwise. `npm test` on `main` at `2879c13` prints `Test Files  44 passed (44)` and
 `Tests  384 passed (384)`. Anything that could not be traced to a test or to a command run for this
 document is either marked as a reading of the source, or cut. The scratch experiments named below were run on
 a clone of `44e42b4`; `2879c13` differs from it only in `package.json` and `package-lock.json`
@@ -122,7 +122,7 @@ a bare `EvidenceTally` has nowhere to put a failure, and a zero-episode delta ha
   `lib/evidence/__tests__/order-independence.test.ts` — "every one of the 5! = 120 orderings of a
   5-episode, 3-context scenario (including a repeated context) produces the identical EvidenceTally", "50
   identical-context episodes plus 2 genuinely distinct ones — every ordering still reports distinctContexts:
-  3", and 150 seeded property scenarios (titles `scenario seed=0` … `scenario seed=149`). Its generator
+  3", and 150 seeded property scenarios (titles beginning `scenario seed=0` … `scenario seed=149`). Its generator
   draws `contextId` from a pool of three, so collisions happen; the test that checks this is "CONFIRMS THE
   GENERATOR CAN ACTUALLY PRODUCE THE CASE THAT MATTERS…".
 - **Refuses to crash on a hostile array.** A `Proxy` or a throwing getter becomes a typed
@@ -175,7 +175,8 @@ accepts: a defensive copy of the invariants, with the array and every element fr
 **What it refuses, and why:**
 
 - **Refuses to let evidence change its answer — by having no parameter to receive evidence.** Passing a
-  third argument is a compile error, not an ignored value. **[tsc]** *Test:*
+  third argument is a compile error, not an ignored value. **[tsc]** for that error; the same test also asserts
+  `"frozen"` at runtime. *Test:*
   `lib/invariants/__tests__/gate.test.ts` — "STRUCTURAL PROOF: gate's own signature has no slot for evidence
   at all — passing a third argument is a compile error, not a runtime no-op". Empirically:
   `lib/invariants/__tests__/immunity.test.ts` — "10,000 'helped' episodes across 10,000 DISTINCT contexts still
