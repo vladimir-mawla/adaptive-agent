@@ -166,7 +166,7 @@ repository's `typescript@7.0.2`. `npm run typecheck` is the backstop, but it is 
 Pinned by `tests/failures/15-eslint-config-ignores-typescript.test.ts`. A related coupling: that file shells out
 to `npm run typecheck` and `npx eslint` and writes two deliberately broken `.ts` fixtures under
 `tests/failures/` (`.scratch-case-15-dotdir-repro/` and `scratch-case-15/`) while it runs and removes them afterwards (untracked entries appear in `git status` during a run; the tree is clean after), so a type error anywhere also fails `npm test` (observed: weakening one
-`frozen` field in a scratch clone failed exactly that file), and an interrupted run could leave the fixture
+`frozen` field in a scratch clone failed exactly that file), and an interrupted run could leave the fixtures
 behind.
 
 **9. The demo form's click wiring has no automated test.** In a scratch clone, replacing the `outcome` stored
