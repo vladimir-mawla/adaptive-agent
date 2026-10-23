@@ -44,16 +44,26 @@ import { evaluateDelta } from "../domains/support-triage/scenario.js";
  * amount of injected evidence ever flips its phase, which is the headline contrast this
  * milestone exists to make reachable in the UI.
  *
- * WHY THIS FILE CANNOT HAND `arbitrate` AN INPUT THAT THROWS (see `.genesis/decisions/
- * 0008-demo.md` for the full argument): `arbitrate` throws on exactly two conditions --
- * `tally.deltaId !== delta.id`, and an inconsistent `gateResult`/`invariantRegistry` pair. This
- * file never builds a `tally` or a `gateResult` by hand at all -- it calls `evaluateDelta`
- * (`scenario.ts`, FROZEN), which always tallies with `delta.id` itself and always gates against
- * this domain's one `SUPPORT_TRIAGE_REGISTRY` -- so the pair `arbitrate` receives is consistent
- * BY CONSTRUCTION, not by a runtime check this file adds on top. The three `BehaviorDelta`
- * values below are fixed module-level constants with distinct, hardcoded ids; nothing in
- * `AdaptiveAgentDemo.tsx` lets a person type or choose a delta id, so no injected input can ever
- * reach `evaluateDelta` paired with the wrong delta's episodes.
+ * WHY THIS FILE REACHES NONE OF `arbitrate`'S THROW SITES (see `.genesis/decisions/
+ * 0008-demo.md`, Decision 3, for the full argument): `lib/arbitrate/arbitrate.ts` contains
+ * three `throw new Error` sites. Two are caller-inducible: `tally.deltaId !== delta.id`, and
+ * `gateResult === "frozen"` with no invariant on `delta.knob` in the supplied registry. The third
+ * (`buildFrozenDecision`) is a defence-in-depth guard on a literal the function has just built;
+ * `assertFrozenCitesNoEvidence` cannot fail on it, so no caller input reaches it. This file
+ * reaches none of the three: it never builds a `tally` or a `gateResult` by hand at all -- it
+ * calls `evaluateDelta` (`scenario.ts`, FROZEN), which always tallies with `delta.id` itself and
+ * always gates against this domain's one `SUPPORT_TRIAGE_REGISTRY` -- so the pair `arbitrate`
+ * receives is consistent BY CONSTRUCTION, not by a runtime check this file adds on top. The three
+ * `BehaviorDelta` values below are fixed module-level constants with distinct, hardcoded ids;
+ * nothing in `AdaptiveAgentDemo.tsx` lets a person type or choose a delta id, so no injected input
+ * can ever reach `evaluateDelta` paired with the wrong delta's episodes.
+ *
+ * A FOURTH THROW SITE EXISTS, AND IT IS THIS FILE'S OWN: `mustEvaluate`, below, throws if
+ * `evaluateDelta` reports that `lib/evidence.tally` refused an episode set. That is reachable only
+ * if `tally` refuses -- which the rendered controls cannot cause (the outcome comes from a closed
+ * `<select>`, any typed context id is still a string, and every episode is built here with the
+ * knob's own delta id). It is deliberately not caught: fabricating a decision after the engine
+ * refused would be the failure this milestone exists to avoid.
  */
 
 /** The three knobs this demo exposes a panel for — the full `DomainKnobId` vocabulary (two adaptable, one invariant-protected), reused directly rather than re-declared so this file cannot silently drift from `invariants.ts`'s own union. */
