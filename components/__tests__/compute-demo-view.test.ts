@@ -186,11 +186,15 @@ describe("auto-refund-ceiling: frozen, unconditionally, regardless of evidence",
     const flood = Array.from({ length: 10_000 }, (_, i) => helped(`tck-flood-${i}`));
     const view = computeKnobView("auto-refund-ceiling", flood);
     expect(view.decision).toEqual(FROZEN_DECISION);
+    // Not vacuous: all 10,000 really reached the engine. A view-model that dropped them before
+    // evaluating would also report "frozen", and this assertion is what tells the two apart.
+    expect(view.trialEpisodes).toHaveLength(10_000);
   });
 
   it("never leaves the trial phase, no matter how much evidence piles up", () => {
     const view = computeKnobView("auto-refund-ceiling", Array.from({ length: 500 }, (_, i) => helped(`tck-${i}`)));
     expect(view.phase).toBe("trial");
+    expect(view.trialEpisodes).toHaveLength(500);
     expect(view.monitoringEpisodes).toHaveLength(0);
   });
 });
