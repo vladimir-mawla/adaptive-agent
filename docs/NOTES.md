@@ -46,7 +46,8 @@ PR #17 was opened at 22:17:55 and merged at 22:34:19, and the tables below were 
 Counted from the table and the commands above:
 
 - 17 PRs: 16 merged, 1 closed without merging (#5), 0 open at the snapshot.
-- 107 commits across the 17 PR branches (102 in the 16 merged PRs, 5 in #5), from `gh pr view N --json commits`.
+- 107 commit entries across the 17 PR branches (102 in the 16 merged PRs, 5 in #5), from `gh pr view N --json commits`; 103
+  of them are distinct SHAs, because four commits appear in both #4 and #5.
 - `main` has 21 commits: 5 pushed straight to it before any PR (GitHub author dates 2026-09-22T21:03:26Z to
   21:05:45Z) and 16 squash commits, one per merged PR.
 - Merges landed on four UTC dates: 2026-09-22 (#1 to #3), 2026-09-23 (#4, #6), 2026-09-30 (#7 to #14) and
@@ -55,7 +56,7 @@ Counted from the table and the commands above:
   repository does not say why.
 - #15 was open for 23 d 1 h 21 m 40 s. ADR 0008 (dated 2026-09-30) records, in Decision 7, that at that revision
   deployment was blocked because the Vercel CLI was logged out and the token was being rotated. The repository
-  records nothing else about the interval, except the message of the merge-chore commit `44e42b4`, which says M8
+  records nothing else about why the interval was long, except the message of the merge-chore commit `44e42b4`, which says M8
   "merged as #15 after four verification rounds".
 - ADR dates: 0001 to 0003 carry 2026-09-23, and 0004 to 0008 carry 2026-09-30. ADR 0008 reached `main` 23 days
   after the date it carries.
@@ -118,18 +119,18 @@ body.
 The repository holds ADRs, PR comments and commit messages. It does not hold the verification transcripts, so the number
 of rounds for M2 to M6, and for M8's third and fourth, cannot be reconstructed beyond what is below.
 
-| Milestone | What is recorded | Where |
+| Milestone | What is recorded (as the ADR or PR names it; not necessarily exhaustive) | Where |
 |---|---|---|
 | M1 | A rejection that found the `frozen` claim false (seven bypass routes compiled), then a second pass that corrected three wording overstatements | ADR 0001, Decision 1 (heading "REVISED AFTER L4 VERIFY REJECTION (round 2)", sub-headings "Round 1" and "Round 2"); PR #1 comments at 21:43:50 and 22:02:21; merged 22:02:47, 26 seconds after the second comment |
 | M2 | "this round's independent review of the ADR-only redeploy" | ADR 0002, Decision 2 (the phrase "L4 VERIFY" does not occur in it) |
 | M3 | A spelling-drift gap flagged by L4 VERIFY, disclosed by a follow-up ADR commit | PR #5's title; ADR 0003 |
 | M4 | One finding: the freeze is one level deep | ADR 0004 |
-| M5 | A missing `tally.deltaId` check, an overclaim in Decision 6, and a third proof added to Decision 7 | ADR 0005 |
-| M6 | One finding: a cast defeats both layers on `knobs.ts` | ADR 0006 |
+| M5 | A missing `tally.deltaId` check, an overclaim in Decision 6, a third proof added to Decision 7, and a duplicated-predicate coupling risk "named by L4 VERIFY" | ADR 0005 |
+| M6 | A cast defeats both layers on `knobs.ts`; and the consequence that `npm run lint` passing is no check on TypeScript, "confirmed by L4 VERIFY" | ADR 0006 |
 | M7 | "Round 2": three findings (a false typecheck claim in case 15, an incompletely reasoned predicate-drift deferral, no value-range check) | ADR 0007; PR #13 comments at 19:57:52 and 20:06:22 |
 | M8 | Sections headed "Round 2" and "Round 3 — L4 VERIFY's second rejection"; the merge-chore commit says "four verification rounds" and that "Every later rejection was a sentence written during the previous fix" | ADR 0008; commit `44e42b4` |
 
-Counted: ADR headings that name a numbered round are 0001 (two sub-headings), 0007 (one) and 0008 (two). Occurrences of
+Counted: ADR headings that name a numbered round are 0001 (the Decision 1 heading, which says "round 2", and two sub-headings), 0007 (one) and 0008 (two). Occurrences of
 the phrase "L4 VERIFY" per ADR, which counts the phrase and not rounds: 0001: 9, 0002: 0, 0003: 0, 0004: 1, 0005: 6,
 0006: 4, 0007: 6, 0008: 8 (`grep -o 'L4 VERIFY' <file> | wc -l`).
 
@@ -140,13 +141,15 @@ the phrase "L4 VERIFY" per ADR, which counts the phrase and not rounds: 0001: 9,
 
 | Set of commits | Count | GitHub resolves the author to | Committer |
 |---|---|---|---|
-| Branch commits in the 17 PRs | 107 | `vldmr-mawla`, all 107 | not collected |
+| Branch commit entries in the 17 PRs (103 distinct SHAs) | 107 | `vldmr-mawla`, all 107 | not collected |
 | Pushed straight to `main`, before any PR | 5 | `vldmr-mawla` | `vldmr-mawla` |
 | Squash commits on `main`, one per merged PR | 16 | `vladimir-mawla` | `web-flow` |
 
-- A squash merge writes a new commit authored by the merging account. Comparing a branch commit with the squash commit that
-  replaced it shows `vldmr-mawla` against `vladimir-mawla` for the same work. That is how `gh pr merge --squash` works,
-  not a discrepancy, and the comparison to make is branch commits with branch commits and `main` with `main`.
+- A squash merge writes a new commit with a new author identity. Comparing a branch commit with the squash commit that
+  replaced it shows `vldmr-mawla` against `vladimir-mawla` for the same work. That is a property of squash merging, not a
+  discrepancy, and the comparison to make is branch commits with branch commits and `main` with `main`. For all 16 merged
+  PRs, `gh api repos/vladimir-mawla/adaptive-agent/pulls/N` gives the same account, `vladimir-mawla`, as opener (`user.login`)
+  and as merger (`merged_by.login`), so this data cannot show which of the two GitHub uses for the squash commit's author.
 - `main` is not uniformly `vladimir-mawla`: 5 of its 21 commits resolve to `vldmr-mawla`, the genesis commits pushed
   directly. The commit email on those five, and on the 14 commits of PR #1, is `vladimir.mawla@aspiresoftware.com`; on the
   squash commits it is `105279249+vladimir-mawla@users.noreply.github.com`.
@@ -338,7 +341,7 @@ total: 6` by package, with 11 advisories under `next` (3 critical, 2 high, 5 mod
 
 ## 10. The README's commands, run as written
 
-In a fresh `git clone -b m9-deliverables` of this branch at `c64061d` (the last commit that touched `README.md`), on Node v24.7.0
+In a fresh `git clone -b m9-deliverables` of this branch at `81fe180` (its `README.md` is the one from `45edbc7`, the last commit that touched it), on Node v24.7.0
 and npm 11.5.1, each command from the README's code block, in its order, plus the other commands the README tells a reader to run:
 
 | Command | Exit | What it printed |
