@@ -386,10 +386,16 @@ built once through `createInvariantRegistry`; `scenario.ts` holds `evaluateDelta
   adopt on an adaptable knob…".
 - **Refuses to judge a revert on pre-adoption evidence.** Each phase has its own episode pool (ADR 0006,
   Decision 3); otherwise three `helped` trial episodes could outvote any number of later `harmed` ones that did
-  not exceed them. *Tests:* `scenario.test.ts` — "one post-adoption harmed episode -> adopt continues, not
-  revert", "two distinct post-adoption harmed episodes -> revert, to the immediately-prior value" (asserts
-  `revertedTo` equals the delta's `from`). This is a domain choice that `arbitrate`'s signature accepts but
-  does not enforce.
+  not exceed them. `evaluateDelta` takes whatever pool it is handed, so the split is made by its caller; here
+  that is `computeKnobView` in `components/compute-demo-view.ts`. *Tests:*
+  `components/__tests__/compute-demo-view.test.ts` — "one post-adoption harmed episode is NOT enough to revert
+  (asymmetric bar, but not zero); the tally is the monitoring pool's alone" (asserts the tally is
+  `distinctContexts: 1, helped: 0, neutral: 0, harmed: 1` after three `helped` trial episodes and one `harmed`),
+  "a SECOND distinct post-adoption harmed episode flips it to revert ON THE LAST EPISODE, rolling back to
+  delta.from, citing the real 2-distinct / 2-harmed tally". A mutant that evaluates the live phase on the
+  trial and monitoring pools together made 8 tests fail, all in `components/__tests__/`.
+  `domains/support-triage/__tests__/scenario.test.ts` passes a monitoring pool it is already given, so it pins
+  the revert bar, not the split. `arbitrate`'s signature accepts a cumulative pool and does not enforce this.
 - **Refuses to hide the spelling-drift limit.** *Test:* `scenario.test.ts` — "three case/whitespace variants of
   ONE real ticket clear the same distinct-context bar a genuine three-ticket corroboration would" (asserts
   `adopt`, `distinctContexts` 3).
