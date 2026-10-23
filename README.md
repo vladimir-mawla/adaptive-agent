@@ -85,7 +85,7 @@ npm run lint
 
 ## Limits
 
-Each limit below was reproduced or re-read for this document, and names the test or command that pins it.
+Each limit below was reproduced or re-read for this document, and names the test, command or file behind it, or says that none exists.
 `npm test -- failures` runs the 17-case failure suite: five cases prove a refusal holds, ten disclose a gap,
 one is mixed (13) and one pins three textual facts (16). **"Probe"** means the block under "Limits probe" in
 `docs/NOTES.md`, run from the repository root; **"scratch clone"** means a throwaway clone of `main` at
