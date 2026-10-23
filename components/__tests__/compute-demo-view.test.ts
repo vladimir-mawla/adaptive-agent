@@ -186,8 +186,10 @@ describe("auto-refund-ceiling: frozen, unconditionally, regardless of evidence",
     const flood = Array.from({ length: 10_000 }, (_, i) => helped(`tck-flood-${i}`));
     const view = computeKnobView("auto-refund-ceiling", flood);
     expect(view.decision).toEqual(FROZEN_DECISION);
-    // Not vacuous: all 10,000 really reached the engine. A view-model that dropped them before
-    // evaluating would also report "frozen", and this assertion is what tells the two apart.
+    // Not vacuous against a view-model that DROPS the episodes: all 10,000 are retained in the pool
+    // the view hands to evaluateDelta. That evaluateDelta is actually CALLED with that pool cannot
+    // be seen from this output (a frozen decision carries no tally); it is observed separately, at
+    // the evaluateDelta and arbitrate boundaries, in compute-demo-view.engine-spy.test.ts.
     expect(view.trialEpisodes).toHaveLength(10_000);
   });
 
@@ -199,7 +201,7 @@ describe("auto-refund-ceiling: frozen, unconditionally, regardless of evidence",
   });
 });
 
-describe("every displayed value is the real engine's tally of the episodes actually shown", () => {
+describe("the displayed tally equals an independent recount of the pool the decision came from, at every prefix of one fixed mixed history", () => {
   /** An independent recount, written here from scratch rather than imported from the engine — a deliberately second, simpler implementation to check the first one's output against. */
   function recount(episodes: readonly Episode[]) {
     return {
@@ -234,8 +236,9 @@ describe("every displayed value is the real engine's tally of the episodes actua
         expect(view.delta).toBe(delta);
         expect(view.decision.deltaId).toBe(delta.id);
 
-        // Every episode handed to the engine carries THIS knob's own delta id — the construction
-        // property that keeps tally.deltaId === delta.id — and nothing is dropped or reordered.
+        // Every episode the VIEW RETAINS (trial + monitoring pool) carries THIS knob's own delta id,
+        // and the retained pool is exactly the input history, in order. What evaluateDelta is
+        // actually called with is observed separately, in compute-demo-view.engine-spy.test.ts.
         const all = [...view.trialEpisodes, ...view.monitoringEpisodes];
         expect(all.every((e) => e.deltaId === delta.id)).toBe(true);
         expect(all.map((e) => ({ contextId: String(e.contextId), outcome: e.outcome }))).toEqual(prefix);
@@ -252,10 +255,11 @@ describe("every displayed value is the real engine's tally of the episodes actua
   }
 });
 
-describe("no string a text field can produce makes the view-model throw", () => {
+describe("a fixed corpus of adversarial strings does not make the view-model throw", () => {
   // A FIXED adversarial corpus, not a proof: the empty string, whitespace, NUL, a right-to-left
-  // override, a lone surrogate, names that collide with Object.prototype members, and a 1 MiB
-  // string. (An independent verifier separately fuzzed 4,000 random calls with zero throws.)
+  // override, a lone surrogate, names that collide with Object.prototype members, and a
+  // 1,048,576-character string. (An independent verifier separately fuzzed 4,000 random calls,
+  // with a 1,000,000-character string among them, and none threw.)
   const CORPUS: readonly string[] = [
     "",
     " ",
