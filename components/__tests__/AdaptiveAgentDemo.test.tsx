@@ -42,6 +42,24 @@ describe("AdaptiveAgentDemo render smoke test", () => {
     expect(panelMarkup).not.toContain("ADOPT");
     expect(panelMarkup).not.toContain("REVERT");
   });
+
+  it("renders the contextId-spelling-drift note beside the context-id field, naming the three-way example (ADR 0008, Decision 4)", () => {
+    const markup = renderToStaticMarkup(<AdaptiveAgentDemo />);
+    // This note IS the decision to surface the limit rather than hide or normalize it; deleting it
+    // is a regression of that decision, so it is pinned, not left to a manual look at the page.
+    expect(markup).toContain("Context ids are compared by exact string equality, never normalized");
+    expect(markup).toContain("&quot;tck-1&quot;");
+    expect(markup).toContain("&quot;TCK-1&quot;");
+    expect(markup).toContain("&quot; tck-1 &quot;");
+    expect(markup).toContain("count as three distinct contexts");
+    // ... and it sits inside the injection form, next to the field it is about.
+    const formStart = markup.indexOf("<form");
+    const formEnd = markup.indexOf("</form>");
+    const noteAt = markup.indexOf("Context ids are compared by exact string equality");
+    expect(formStart).toBeGreaterThan(-1);
+    expect(noteAt).toBeGreaterThan(formStart);
+    expect(noteAt).toBeLessThan(formEnd);
+  });
 });
 
 function helped(id: string): RawEpisodeInput {
