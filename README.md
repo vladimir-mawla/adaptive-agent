@@ -4,7 +4,7 @@ Whether an agent's proposed change to its own future behavior has earned the rig
 on independent, diverse evidence rather than one loud incident.
 
 **Live:** <https://adaptive-agent-gamma.vercel.app> — a page where you inject episodes and watch the real
-engine rule on them. `GET /api/health` runs a self-check and reports the deployed commit. All times in this
+engine rule on them. `GET /api/health` runs a self-check of one function, `assertFrozenCitesNoEvidence`, not of `tally`, `gate` or `arbitrate`, and reports the deployed commit. All times in this
 document are UTC.
 
 ## What this is
