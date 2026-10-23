@@ -40,7 +40,8 @@ const EMPTY_INPUTS: InputsByKnob = {
   "auto-refund-ceiling": [],
 };
 
-function describeDecision(view: KnobView): string {
+/** Exported only so `__tests__/AdaptiveAgentDemo.test.tsx` can pin the rendered text against real engine decisions — nothing else imports it. */
+export function describeDecision(view: KnobView): string {
   const decision = view.decision;
   switch (decision.kind) {
     case "adopt":
@@ -56,7 +57,8 @@ function describeDecision(view: KnobView): string {
   }
 }
 
-function KnobPanel({ view }: { readonly view: KnobView }) {
+/** Exported only so `__tests__/AdaptiveAgentDemo.test.tsx` can render a panel for a real mid-story view (a static server render of the whole page can only ever show the zero-episode state) — nothing else imports it. */
+export function KnobPanel({ view }: { readonly view: KnobView }) {
   return (
     <section data-testid={`knob-panel-${view.knobId}`} style={{ border: "1px solid #444", borderRadius: 8, padding: 16, marginBottom: 16 }}>
       <h2 style={{ margin: "0 0 4px" }}>{KNOB_LABELS[view.knobId]}</h2>
