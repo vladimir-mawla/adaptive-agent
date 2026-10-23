@@ -24,8 +24,8 @@ import { evaluateDelta } from "../domains/support-triage/scenario.js";
  * No `useEffect`, `useCallback`, `setTimeout`, `Promise`, or any other asynchrony anywhere in
  * this file or in `AdaptiveAgentDemo.tsx` — `lib/**` is entirely synchronous and pure, so
  * deriving the whole view fresh from `(knobId, episodeLog)` on every render is simplest and
- * safest (see this milestone's own ADR, `.genesis/decisions/0008-demo.md`, "the traps" section,
- * for the sibling precedent this follows).
+ * safest (see `.genesis/decisions/0008-demo.md`, Decision 1, for why, and for the stale-derived-
+ * state failure this avoids).
  *
  * THE TWO-PHASE MODEL, INHERITED FROM `scenario.ts`, NOT REINVENTED: `lib/arbitrate.arbitrate`
  * takes exactly one `tally` and one `priorState` per call and has no memory of a delta's own
