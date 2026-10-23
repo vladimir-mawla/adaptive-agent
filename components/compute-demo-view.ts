@@ -38,11 +38,13 @@ import { evaluateDelta } from "../domains/support-triage/scenario.js";
  * pool (it is what caused the adoption); every episode injected after that point goes into a
  * separate, fresh `monitoring` pool, matching `ESCALATION_TRIAL_EPISODES` /
  * `ESCALATION_MONITORING_EPISODES`'s own separation in `scenario.ts`. A knob whose delta targets
- * the invariant-protected `auto-refund-ceiling` knob never leaves `"trial"` — `lib/invariants.gate`
- * rules it `frozen` unconditionally, before `priorState` is even consulted (see
- * `lib/arbitrate/arbitrate.ts`'s own `gateResult === "frozen"` check, which runs first) — so no
- * amount of injected evidence ever flips its phase, which is the headline contrast this
- * milestone exists to make reachable in the UI.
+ * the invariant-protected `auto-refund-ceiling` knob stays `"trial"` in every history the tests
+ * drive (up to 10,000 episodes): `lib/invariants.gate` gives it a `frozen` verdict, and in
+ * `lib/arbitrate/arbitrate.ts` (lines 244-262), after its `tally.deltaId` consistency check,
+ * `gateResult === "frozen"` is ruled on before `priorState` or any of the tally's counts are read
+ * (`evaluateDelta` itself computes the tally first) — so the phase fold below, which flips only on
+ * an `adopt` decision, never sees one for this knob. That is the headline contrast this milestone
+ * exists to make reachable in the UI.
  *
  * WHY THIS FILE REACHES NONE OF `arbitrate`'S THROW SITES (see `.genesis/decisions/
  * 0008-demo.md`, Decision 3, for the full argument): `lib/arbitrate/arbitrate.ts` contains
