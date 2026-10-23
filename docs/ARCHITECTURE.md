@@ -349,7 +349,7 @@ forbade the change and no evidence at all.
   Run for this document in a scratch clone: adding `{ kind: "bogus"; deltaId }` to the union made
   `npm run typecheck` fail at `scripts/demo-triage.ts(59,44)` and `components/AdaptiveAgentDemo.tsx(57,44)` (the
   `default` arms calling `assertNeverAdaptationDecision`), and at two lines of
-  `components/__tests__/compute-demo-view.test.ts`. No non-test file under `lib/` switches on the union (`grep -rn -E 'case "(adopt|hold|revert|frozen)"|\.kind === "(adopt|hold|revert|frozen)"|assertNever' lib --include='*.ts'` matches only the definition, the re-export and comments).
+  `components/__tests__/compute-demo-view.test.ts`. No non-test file under `lib/` switches on the union: `grep -rn -E 'case "(adopt|hold|revert|frozen)"|\.kind === "(adopt|hold|revert|frozen)"|assertNever' lib --include='*.ts' --exclude-dir=__tests__` matches only the definition, the re-export and comments.
 - **Disclosed, not refused: `adopt`, `hold` and `revert` can carry each other's stray fields.** *Tests:*
   `adaptation-decision.test.ts` — "adopt can still carry a stray invariant field via a non-literal route today", "hold can still carry a
   stray revertedTo field via a non-literal route today", "revert can still carry a stray distinctContextsNeeded
