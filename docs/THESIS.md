@@ -1,6 +1,6 @@
 # Thesis
 
-**The claim.** Whether an agent's proposed change to its own behaviour should stick depends on how many independent occasions support it, not on how often anyone has complained. This project counts distinct `contextId`s, never episodes. It asks fewer of them to undo a change (two) than to adopt one (three). And it gives one knob a freeze that no evidence can lift.
+**The claim.** Whether an agent's proposed change to its own behaviour should stick depends on how many independent occasions support it, not on how often anyone has complained. This project counts corroboration by distinct `contextId`s, not by episodes. It asks fewer of them to undo a change (two) than to adopt one (three). And it gives one knob a freeze that no evidence can lift.
 
 **Where a reader should disagree.**
 
