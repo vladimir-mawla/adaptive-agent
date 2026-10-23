@@ -11,19 +11,19 @@ document are UTC.
 
 A candidate change to one behavior knob (a `BehaviorDelta`) and a stream of evidence about it (`Episode`s,
 each with a `contextId` and an outcome of `helped`, `neutral` or `harmed`) pass through three stages —
-`tally` → `gate` → `arbitrate` — and come out as exactly one of four decisions:
+`tally` → `gate` → `arbitrate` — and come out, for well-formed input, as exactly one of four decisions:
 
 | Decision | Meaning | When |
 |---|---|---|
-| `adopt` | the change sticks | at least 3 distinct `contextId`s, and more `helped` episodes than `neutral` + `harmed` |
+| `adopt` | the change sticks | for a not-yet-adopted change, at least 3 distinct `contextId`s and more `helped` episodes than `neutral` + `harmed`; an adopted change stays `adopt` until the revert bar is met |
 | `hold` | not yet; says how many more distinct contexts it needs | evidence short of that bar, or a different change is already live on the knob |
 | `revert` | an adopted change is rolled back to the value it replaced | at least 2 distinct post-adoption contexts, and more `harmed` episodes than `helped` + `neutral` |
-| `frozen` | refused outright | the knob is named by an `Invariant`; the evidence's counts are never read |
+| `frozen` | refused outright | the knob is named by an `Invariant`; neither `gate` nor `arbitrate`'s frozen branch consults the evidence's counts |
 
 The refusal this exists to make: one ticket complained about 500 times is one occasion
-(`distinctContexts: 1`), not 500, because corroboration is counted by distinct `contextId`, never by
+(`distinctContexts: 1`), not 500, because corroboration is counted by distinct `contextId`, not by
 episode count. The adopt bar (3) is higher than the revert bar (2) on purpose. `docs/ARCHITECTURE.md`
-walks each stage and cites a test for every refusal; `docs/THESIS.md` says what a reader should disagree
+walks each stage and cites a test for every refusal except one, which it marks; `docs/THESIS.md` says what a reader should disagree
 with.
 
 **What it is not.** There is no agent in this repository. The "support-triage agent" is three knobs, one
@@ -34,7 +34,7 @@ constants (`lib/arbitrate/policy-constants.ts` says so), and every episode in th
 
 ## Try it
 
-- Open the live page and follow `docs/WALKTHROUGH.md` (about 80 seconds). Three helped tickets move
+- Open the live page and follow `docs/WALKTHROUGH.md` (estimated at about 80 seconds). Three helped tickets move
   `escalation-aggressiveness` from `hold` to `adopt`; two harmed ones revert it; the same three helped tickets
   against `auto-refund-ceiling` leave it `frozen`.
 - `curl -s https://adaptive-agent-gamma.vercel.app/api/health` returns JSON with `"status":"ok"` and the
@@ -104,7 +104,7 @@ driven on the deployed URL on 2026-10-23.) The form's blank check is `contextIdT
 `"\u200b".trim().length` is 1, so a zero-width-only id passes it; I read that and ran `trim()` in the page, but did
 not submit one through the form. Pinned by `tests/failures/06-context-id-spelling-drift.test.ts` (five spellings
 resolve `adopt`, `distinctContexts` 5) and step 7 of `npm run demo:triage`; probe block 1 prints the four
-mechanisms. Closes only if whoever mints ids canonicalizes them before they reach `tally`.
+mechanisms. Closes if whoever mints ids canonicalizes them before they reach `tally`.
 
 **2. No value-range check at all.** Neither `gate` nor `arbitrate` reads `delta.from` or `delta.to` in code, and
 `proposeDelta` stores them unchecked. A proposal to move a knob documented as `[0, 1]` to 999,999 **adopts on
@@ -146,7 +146,7 @@ unless code builds and passes such a value. Two more residuals: `assertFrozenCit
 fields are absent, not where a value came from, and a `frozen` value arriving as `any` (for example from
 `JSON.parse`) type-checks with no error (checked in a scratch file); and `adopt`, `hold` and `revert` are not
 defended against carrying each other's stray fields
-(`lib/contracts/__tests__/adaptation-decision.test.ts`, the three "HONEST LIMIT" tests).
+(`lib/contracts/__tests__/adaptation-decision.test.ts`, the three tests under the "HONEST LIMIT" describe block).
 
 **6. `Object.freeze` is one level deep.** Every registry element is frozen, but a field holding an object
 would stay mutable. That is true today only because `Invariant` is three primitive fields.
@@ -237,7 +237,7 @@ verbose run, against vitest's 5 s default timeout. With one busy loop per CPU co
 `/api/health` has no committed test (ADR 0002 records a manual break-and-revert proof).
 
 **19. Plan items this milestone does not deliver.** `.genesis/PLAN.md` §3 (M9) names a drift guard,
-`app/milestones.test.ts`; it does not exist, and `app/**` is outside this milestone's scope. The Loom recording
+`app/milestones.test.ts`; it does not exist, and `app/**` was not changed in this milestone. The Loom recording
 has not been made. `.genesis/DONE.html` (locked) says the failure suite has "ten" cases; it has 17.
 
 ## Stack
@@ -248,9 +248,9 @@ Versions are the exact pins in `package.json`.
 
 ## Documents
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — stage by stage, what each stage refuses, each refusal cited to a test.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — stage by stage, what each stage refuses, each refusal cited to a test (one is marked as having none).
 - [`docs/THESIS.md`](docs/THESIS.md) — the claim, where to disagree with it, and what would make it fail.
 - [`docs/NOTES.md`](docs/NOTES.md) — how it was built and verified, reconstructed from `git`, `gh` and the ADRs.
-- [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md) — the ~80-second script for the live demo.
+- [`docs/WALKTHROUGH.md`](docs/WALKTHROUGH.md) — the script for the live demo, estimated at about 80 seconds.
 - [`.genesis/PLAN.md`](.genesis/PLAN.md), [`.genesis/DONE.html`](.genesis/DONE.html) and
   [`.genesis/decisions/`](.genesis/decisions/) — the plan, the locked definition of done, and eight ADRs.
