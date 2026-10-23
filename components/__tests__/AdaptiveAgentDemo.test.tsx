@@ -22,8 +22,8 @@ describe("AdaptiveAgentDemo render smoke test", () => {
     expect(markup).toContain("response-directness");
     expect(markup).toContain("auto-refund-ceiling");
 
-    // Zero episodes injected yet: the two adaptable knobs must read HOLD, and the
-    // invariant-protected knob must read FROZEN — never ADOPT/REVERT with no evidence at all.
+    // Zero episodes injected yet: the two adaptable knobs must read HOLD, the invariant-protected
+    // knob must read FROZEN, and nothing on the page may read "REVERT to".
     expect(markup).toContain("HOLD");
     expect(markup).toContain("FROZEN");
     expect(markup).not.toContain("REVERT to");
@@ -78,9 +78,10 @@ function harmed(id: string): RawEpisodeInput {
  * on its own it could not tell a panel that renders the engine's decision from one that prints a
  * canned string — L4 VERIFY's mutant that hardcoded `"HOLD — hardcoded"` / `"FROZEN — invariant:
  * hardcoded"` passed the whole suite. Every `view` below comes from a real `computeKnobView` call
- * (the real tally -> gate -> arbitrate chain), and every expected string is a LITERAL with the
- * specific numbers that history must produce — never rebuilt from the same template under test —
- * so a renderer that ignores the decision, or reads the wrong field of it, cannot pass.
+ * (the real tally -> gate -> arbitrate chain), and each expected string is a LITERAL with the
+ * specific numbers that history must produce, not rebuilt from the template under test (the
+ * `frozen` test adds a second assertion built from the invariant constant's id). A renderer that
+ * hardcodes `HOLD`/`FROZEN` or `ADOPT`/`REVERT` fails these tests (ADR 0008, mutants M-F and M-F2).
  */
 describe("describeDecision renders the real engine decision's own values", () => {
   it("hold: the real distinctContextsNeeded and all three counts (1 helped episode)", () => {

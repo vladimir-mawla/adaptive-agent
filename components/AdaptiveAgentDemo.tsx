@@ -16,14 +16,15 @@ import { assertNeverAdaptationDecision } from "../lib/contracts/adaptation-decis
  * `components/AdaptiveAgentDemo.tsx` — the one interactive page M8 owns (plan §3, M8). Renders
  * one panel per knob (`DEMO_KNOB_IDS`), a single injection form that lets a person add an
  * `Episode` with a chosen `contextId` and `outcome` against a chosen knob, and re-derives every
- * panel's `AdaptationDecision` fresh on every render from `compute-demo-view.ts`'s pure
- * `computeKnobView` — never from a value stashed in a ref or computed in an effect.
+ * panel's `AdaptationDecision` fresh on every render from `compute-demo-view.ts`'s
+ * `computeKnobView`, not from a value stashed in a ref or computed in an effect.
  *
- * NO `useEffect`/`useCallback`/`setTimeout`/`async` ANYWHERE IN THIS FILE: the only state this
- * component owns is `inputsByKnob` (the raw, ordered injection history per knob) and the three
- * controlled-form fields below it. Every `KnobView` is recomputed, synchronously, during this
- * render, straight from that state — see `compute-demo-view.ts`'s own header for why that is the
- * safe choice given `lib/**`'s synchronous, pure engine.
+ * NO `useEffect`/`useCallback`/`setTimeout`/`async` IN THIS FILE'S CODE (grep-checked; its only
+ * hook is `useState`, called four times): the only state this component owns is `inputsByKnob`
+ * (the raw, ordered injection history per knob) and the three controlled-form fields below it.
+ * Every `KnobView` is recomputed, synchronously, during this render, straight from that state —
+ * see `compute-demo-view.ts`'s own header for why that is the safe choice given that `lib/**` and
+ * `domains/**` contain no `async`, `await`, `Promise` or timers (grep-checked).
  */
 
 const KNOB_LABELS: { readonly [K in DomainKnobId]: string } = {

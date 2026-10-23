@@ -115,7 +115,7 @@ describe("auto-refund-ceiling: its episodes are passed to evaluateDelta, and arb
       const view = computeKnobView("auto-refund-ceiling", inputs);
 
       // evaluateDelta: called once with the empty list, then once after each episode, each time
-      // with one more episode than the call before — never with a shorter or empty list.
+      // with one more episode than the call before (the lengths are exactly 0, 1, ..., N).
       const evaluateCalls = evaluateCallsFor(PROTECTED_ID);
       expect(evaluateCalls.map((c) => c.length)).toEqual(Array.from({ length: count + 1 }, (_, i) => i));
       expect(evaluateCalls.every((c) => c.priorKind === "vacant")).toBe(true);
@@ -128,7 +128,8 @@ describe("auto-refund-ceiling: its episodes are passed to evaluateDelta, and arb
       expect(lastEpisodes.map((e) => String(e.contextId))).toEqual(inputs.map((input) => input.contextId));
 
       // arbitrate: handed a tally that counts all of them, with a frozen gate verdict, on every call
-      // — and it returns frozen on every call, so the evidence was present and did not decide.
+      // — and it returns frozen on every call, so the tally was present at arbitrate and the
+      // ruling was frozen at every list size from 0 to N.
       const arbitrateCalls = arbitrateCallsFor(PROTECTED_ID);
       expect(arbitrateCalls).toHaveLength(count + 1);
       expect(arbitrateCalls.every((c) => c.gateResult === "frozen" && c.decisionKind === "frozen")).toBe(true);
@@ -141,7 +142,7 @@ describe("auto-refund-ceiling: its episodes are passed to evaluateDelta, and arb
   }
 });
 
-describe("the same three helped tickets reach arbitrate identically for both knobs; only the gate verdict differs", () => {
+describe("the same three helped tickets reach arbitrate with identical counts for both knobs; the gate verdict and the resulting decision differ", () => {
   it("escalation-aggressiveness: tally 3/3/0/0, gateResult eligible, adopt. auto-refund-ceiling: the same counts, gateResult frozen, frozen", () => {
     const inputs = [helped("tck-4471"), helped("tck-5002"), helped("tck-5108")];
     const escalation = computeKnobView("escalation-aggressiveness", inputs);

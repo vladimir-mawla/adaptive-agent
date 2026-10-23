@@ -11,14 +11,14 @@ import { AUTO_REFUND_CEILING_INVARIANT } from "../../domains/support-triage/inva
 
 /**
  * `components/__tests__/compute-demo-view.test.ts` — falsifiable tests for M8's one view-model
- * function. Every test drives `computeKnobView` exactly the way `AdaptiveAgentDemo.tsx` does:
- * an ordered array of `RawEpisodeInput` a person could actually type/select in the form, never
- * a hand-built `Episode`/`EvidenceTally`/`AdaptationDecision` asserted independently of a real
- * call. See `.genesis/decisions/0008-demo.md` for the gutting and mutation experiments this suite
+ * function. Every test except the two `DEMO_DELTAS` constants tests drives `computeKnobView`
+ * the way `AdaptiveAgentDemo.tsx` does: an ordered array of `RawEpisodeInput` a person could
+ * actually type/select in the form, and asserts against the real call's result rather than a
+ * hand-built `Episode`/`EvidenceTally`/`AdaptationDecision` asserted without a call. See `.genesis/decisions/0008-demo.md` for the gutting and mutation experiments this suite
  * was run against.
  *
- * EVERY TALLY ASSERTION BELOW PINS ALL FOUR COUNTS (`distinctContexts`, `helped`, `neutral`,
- * `harmed`), never `distinctContexts` alone. The first revision of this file asserted
+ * EVERY ASSERTION ABOUT TALLY COUNTS BELOW GOES THROUGH `counts()`, WHICH PINS ALL FOUR
+ * (`distinctContexts`, `helped`, `neutral`, `harmed`), never `distinctContexts` alone. The first revision of this file asserted
  * `distinctContexts` in only a couple of tests and `helped`/`neutral`/`harmed` in none, so a
  * mutant that kept `distinctContexts` correct and zeroed `helped` (an `adopt` that cites no
  * helpful evidence) passed the whole suite — see ADR 0008, "Round 2".
@@ -124,7 +124,7 @@ describe("escalation-aggressiveness: hold -> hold -> adopt -> revert, the headli
     expect(view.monitoringEpisodes).toHaveLength(2);
   });
 
-  it("FALSIFIABILITY: a same-context replay storm never reaches adopt — 50 repeats of one ticket is distinctContexts: 1 with helped: 50", () => {
+  it("FALSIFIABILITY: a same-context replay storm of 50 repeats of one ticket does not reach adopt — distinctContexts 1, helped 50", () => {
     const storm = Array.from({ length: 50 }, () => helped("tck-1"));
     const view = computeKnobView("escalation-aggressiveness", storm);
     expect(view.phase).toBe("trial");
@@ -152,7 +152,7 @@ describe("response-directness: the contextId-identity limit, exercised honestly"
   });
 });
 
-describe("auto-refund-ceiling: frozen, unconditionally, regardless of evidence", () => {
+describe("auto-refund-ceiling: frozen at 0, 5, 500 and 10,000 distinct-context helped episodes", () => {
   const FROZEN_DECISION = {
     kind: "frozen",
     deltaId: DEMO_DELTAS["auto-refund-ceiling"].id,
@@ -177,7 +177,7 @@ describe("auto-refund-ceiling: frozen, unconditionally, regardless of evidence",
     ]);
     expect(overwhelmed.phase).toBe("trial");
     expect(overwhelmed.decision).toEqual(FROZEN_DECISION);
-    // Identical ruling, evidence or none — evidence quantity never reaches this decision at all.
+    // The ruling is identical with zero episodes and with five (a frozen decision carries no tally).
     expect(overwhelmed.decision).toEqual(zero.decision);
     expect(overwhelmed.trialEpisodes).toHaveLength(5);
   });
@@ -193,7 +193,7 @@ describe("auto-refund-ceiling: frozen, unconditionally, regardless of evidence",
     expect(view.trialEpisodes).toHaveLength(10_000);
   });
 
-  it("never leaves the trial phase, no matter how much evidence piles up", () => {
+  it("stays in the trial phase through 500 distinct-context helped episodes", () => {
     const view = computeKnobView("auto-refund-ceiling", Array.from({ length: 500 }, (_, i) => helped(`tck-${i}`)));
     expect(view.phase).toBe("trial");
     expect(view.trialEpisodes).toHaveLength(500);
@@ -302,7 +302,7 @@ describe("a fixed corpus of adversarial strings does not make the view-model thr
 });
 
 describe("purity and construction invariants", () => {
-  it("computeKnobView is pure: the same input list produces a deep-equal view every time", () => {
+  it("calling computeKnobView twice on the same input list returns deep-equal views", () => {
     const inputs = [helped("tck-1"), helped("tck-2"), harmed("tck-3")];
     const first = computeKnobView("escalation-aggressiveness", inputs);
     const second = computeKnobView("escalation-aggressiveness", inputs);
