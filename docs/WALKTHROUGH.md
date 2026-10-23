@@ -2,17 +2,14 @@
 
 Read this aloud, performing each bracketed action at that point in the script.
 
-**IMPORTANT, READ FIRST: verified against `http://localhost:3000` (`npm run dev`), NOT against the
-deployed URL.** At the time this milestone (M8) was built, the Vercel CLI on this machine was
-logged out and `VERCEL_TOKEN` was not in the environment (the token was being rotated) — deploying
-was explicitly out of scope for this round. `https://adaptive-agent-gamma.vercel.app` still serves
-the pre-M8 build (M7) and has **not** been updated with this milestone's UI. Every on-screen state
-the narration describes (the rulings, tallies, phases and episode counters) was checked against a
-real, running `next dev --webpack` session on this machine instead — this is a transcript of an
-actual click-through of `localhost:3000`, re-read as narration, not a script written against
-intentions. Re-verify against the deployed URL once it is redeployed with
-this milestone's changes (a later session's job, not this one's — see this milestone's own PR/report
-for why deploying was refused here).
+**Verification status, corrected for M9.** This script was written and first verified against
+`http://localhost:3000` (`npm run dev`), because when M8 was built the Vercel CLI was logged out and
+`https://adaptive-agent-gamma.vercel.app` still served the pre-M8 build. **That is no longer true.** For M9
+the whole sequence below was driven in a browser against the deployed URL on 2026-10-23, twice: once while
+`/api/health` reported `44e42b494ccc711e199c190c96cc91054a6a99d5`, and once while it reported
+`2879c13f3465ef2d8dd6cff502cae15b175b6852`. Each state read back from the deployed page matched the
+corresponding step under "Verification" below; `docs/NOTES.md` records the times and the readings. The
+localhost verification that follows is kept as it was written.
 
 ## What the last beat has to prove, and why it injects three episodes, not one
 
@@ -132,4 +129,8 @@ context(s), helped=3 neutral=0 harmed=0`. This is the identical, disclosed `cont
 `domains/support-triage/scenario.ts` and `tests/failures/06-context-id-spelling-drift.test.ts`
 already pin — exercised honestly in this UI (the help text next to the context-id field names it
 directly), not hidden and not normalized away. It was not re-driven in this revision's session, which
-changed only the final beat of the timed script.
+changed only the final beat of the timed script. For M9 it was also driven on the deployed URL
+(2026-10-23): `response-directness` read `ADOPT — tally: 3 distinct context(s), helped=3 neutral=0 harmed=0`
+after `tck-9001`, `TCK-9001` and ` tck-9001 `, and the same ticket typed identically three times on
+`escalation-aggressiveness` read `HOLD — needs 2 more distinct context(s); tally: 1 distinct, helped=3 neutral=0
+harmed=0`.
