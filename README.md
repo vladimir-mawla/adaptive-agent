@@ -193,7 +193,7 @@ Nothing in this repository has assessed it.
 
 ### Further limits
 
-These are gathered here. Items 12, 13, 17 and 18 were already recorded elsewhere (`lib/arbitrate/policy-constants.ts`, ADR 0008 Decision 6, PR #17's description and ADR 0002 respectively), as each item says.
+These are gathered here. Items 12, 13, 17 and 18 were already recorded elsewhere (`lib/arbitrate/policy-constants.ts`, ADR 0008 Decision 6, PR #17's description and ADR 0002 respectively); items 13, 17 and 18 say so, and item 12 is recorded in "What it is not" above.
 
 **11. Nothing consumes the decisions, and the page keeps no state.** See "What it is not". The deployed page
 holds its history in `useState`; there is no storage or network call in `app/` or `components/` (grep for
