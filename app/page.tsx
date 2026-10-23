@@ -1,25 +1,13 @@
+import { AdaptiveAgentDemo } from "../components/AdaptiveAgentDemo";
+
 /**
- * Placeholder home page — genesis only, no engine code and no domain logic.
- *
- * M2 will replace this with a deployed skeleton that exposes a real health
- * endpoint (app/api/health) backed by M1's frozen contracts. M8 will build
- * the actual interactive demo (live episode injection against the
- * support-triage domain from M6). Until then this page exists only so
- * `npm run build` has something real to render.
+ * M8's own page — the interactive demo (plan §3, M8: "Files it owns...
+ * `app/page.tsx`"). Replaces the M2 placeholder with the real thing: live
+ * episode injection against the real `support-triage` domain engine,
+ * rendered by `components/AdaptiveAgentDemo.tsx`. This file itself owns no
+ * logic — it is a thin App Router entry point, matching the shape M2's own
+ * placeholder comment predicted it would take.
  */
 export default function Home() {
-  return (
-    <main>
-      <h1>Adaptive Agent</h1>
-      <p>
-        Whether an agent&rsquo;s proposed change to its own future behavior
-        has earned the right to stick, based on independent, diverse
-        evidence rather than one loud incident.
-      </p>
-      <p>
-        This project is in progress. No live demo exists yet — see the
-        README for current status.
-      </p>
-    </main>
-  );
+  return <AdaptiveAgentDemo />;
 }
