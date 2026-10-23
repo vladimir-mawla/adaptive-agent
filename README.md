@@ -16,7 +16,7 @@ each with a `contextId` and an outcome of `helped`, `neutral` or `harmed`) pass 
 | Decision | Meaning | When |
 |---|---|---|
 | `adopt` | the change sticks | for a not-yet-adopted change, at least 3 distinct `contextId`s and more `helped` episodes than `neutral` + `harmed`; an adopted change stays `adopt` until the revert bar is met |
-| `hold` | not yet; says how many more distinct contexts it needs | evidence short of that bar, or a different change is already live on the knob |
+| `hold` | not yet; carries a `distinctContextsNeeded` count, which is the real shortfall only when too few contexts is the blocker (Limits, item 20) | evidence short of that bar, or a different change is already live on the knob |
 | `revert` | an adopted change is rolled back to the value it replaced | at least 2 distinct post-adoption contexts, and more `harmed` episodes than `helped` + `neutral` |
 | `frozen` | refused outright | the knob is named by an `Invariant`; neither `gate` nor `arbitrate`'s frozen branch consults the evidence's counts |
 
@@ -241,6 +241,8 @@ verbose run, against vitest's 5 s default timeout. With one busy loop per CPU co
 **19. Plan items this milestone does not deliver.** `.genesis/PLAN.md` §3 (M9) names a drift guard,
 `app/milestones.test.ts`; it does not exist, and `app/**` was not changed in this milestone. The Loom recording
 has not been made. `.genesis/DONE.html` (locked) says the failure suite has "ten" cases; it has 17.
+
+**20. `hold` has one number, and it is `0` for two different blockers.** `distinctContextsNeeded` counts only the distinct-context shortfall. It is `0` when a candidate has enough contexts but no helped-majority (2 `helped` and 3 `harmed` contexts) and also when a different change is already live on the knob (10 distinct `helped` contexts), so the decision does not say which blocker applies; the demo page prints `HOLD — needs 0 more distinct context(s)` for the first. Pinned by `tests/failures/12-hold-distinctContextsNeeded-is-zero.test.ts` (routes 2 and 3; route 1 shows the number is honest when contexts are the shortfall); ADR 0005, Decision 5 records it. `AdaptationDecision.hold` has no field for a reason, and adding one is a change to `lib/contracts`.
 
 ## Stack
 
